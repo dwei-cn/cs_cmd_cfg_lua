@@ -8,7 +8,7 @@ local guiOnlyHearableSounds = gui.Checkbox(groupSoundESP, "sound_esp_hearable", 
 local guiEnemySounds = gui.Checkbox(groupSoundESP, "sound_esp_enemy", "Show Enemy Sounds", true)
 guiEnemySounds:SetDescription("Visualize enemy player sounds.")
 local guiEnemyColor = gui.ColorPicker(guiEnemySounds, "clr", "Enemy Sound Color", 255, 0, 0, 255)
-local guiFriendlySounds = gui.Checkbox(groupSoundESP, "sound_esp_friendly", "Show Friendly Sounds", true)
+local guiFriendlySounds = gui.Checkbox(groupSoundESP, "sound_esp_friendly", "Show Friendly Sounds", false)
 guiFriendlySounds:SetDescription("Visualize friendly player sounds.")
 local guiFriendlyColor = gui.ColorPicker(groupSoundESP, "clr", "Friendly Sound Color", 0, 255, 255, 255)
 local guiHeadColor = gui.ColorPicker(groupSoundESP, "head_color", "Head Highlight Color", 255, 255, 0, 255)
