@@ -7,10 +7,13 @@ local guiSoundESP = gui.Checkbox(groupSoundESP, "sound_esp_enable", "Enable Soun
 local guiOnlyHearableSounds = gui.Checkbox(groupSoundESP, "sound_esp_hearable", "Only Show Hearable Sounds", true)
 local guiEnemySounds = gui.Checkbox(groupSoundESP, "sound_esp_enemy", "Show Enemy Sounds", true)
 guiEnemySounds:SetDescription("Visualize enemy player sounds.")
-local guiEnemyColor = gui.ColorPicker(guiEnemySounds, "clr", "Enemy Sound Color", 255, 0, 0, 255)
+local guiEnemyColor = gui.ColorPicker(guiEnemySounds, "clr", "Enemy Sound Color", 0, 255, 0, 255)
 local guiFriendlySounds = gui.Checkbox(groupSoundESP, "sound_esp_friendly", "Show Friendly Sounds", false)
 guiFriendlySounds:SetDescription("Visualize friendly player sounds.")
 local guiFriendlyColor = gui.ColorPicker(groupSoundESP, "clr", "Friendly Sound Color", 0, 255, 255, 255)
+
+-- Head Highlight 控件
+local guiHeadHighlight = gui.Checkbox(groupSoundESP, "head_highlight_enable", "Enable Head Highlight", false)
 local guiHeadColor = gui.ColorPicker(groupSoundESP, "head_color", "Head Highlight Color", 255, 255, 0, 255)
 local guiHeadSize = gui.Slider(groupSoundESP, "head_size", "Head Highlight Size", 5, 2, 10)
 
@@ -24,9 +27,9 @@ local dotColor = gui.ColorPicker(groupDot, "dot_color", "Dot Color", 0, 255, 0, 
 local dotSize = gui.Slider(groupDot, "dot_size", "Dot Size", 2, 1, 10, 1)
 
 -- Velocity 分组
-local groupVelocity = gui.Groupbox(tabAll, "Velocity Display", 335, 260, 300, 0)
-local velocityEnabled = gui.Checkbox(groupVelocity, "velocity_show", "Show Velocity", false)
-local velocityColor = gui.ColorPicker(groupVelocity, "velocity_color", "Text Color", 255, 255, 255, 255)
+-- local groupVelocity = gui.Groupbox(tabAll, "Velocity Display", 335, 260, 300, 0)
+-- local velocityEnabled = gui.Checkbox(groupVelocity, "velocity_show", "Show Velocity", false)
+-- local velocityColor = gui.ColorPicker(groupVelocity, "velocity_color", "Text Color", 255, 255, 255, 255)
 
 -- 工具函数
 local function AreTeamsEnemies(team1, team2)
@@ -141,7 +144,7 @@ callbacks.Register("Draw", function()
                         draw.OutlinedRect(left, topY, right, bottomY)
 
                         local headPosX, headPosY = client.WorldToScreen(origin + Vector3(0, 0, maxs.z - 5))
-                        if headPosX and headPosY then
+                        if guiHeadHighlight:GetValue() and headPosX and headPosY then
                             local hr, hg, hb, ha = unpack(headColor)
                             draw.Color(hr, hg, hb, math.floor(ha * fade * 0.3))
                             draw.FilledCircle(headPosX, headPosY, headSize + 5)
@@ -216,28 +219,28 @@ callbacks.Register("Draw", function()
     end
 end)
 
--- Velocity 显示
-callbacks.Register("Draw", function()
-    if not velocityEnabled:GetValue() then return end
+-- -- Velocity 显示
+-- callbacks.Register("Draw", function()
+--     if not velocityEnabled:GetValue() then return end
 
-    local localPlayer = entities.GetLocalPlayer()
-    if not localPlayer or not localPlayer:IsAlive() then return end
+--     local localPlayer = entities.GetLocalPlayer()
+--     if not localPlayer or not localPlayer:IsAlive() then return end
 
-    local vel = localPlayer:GetPropVector("m_vecVelocity")
-    local speed = math.floor(vel:Length2D() + 0.5)
+--     local vel = localPlayer:GetPropVector("m_vecVelocity")
+--     local speed = math.floor(vel:Length2D() + 0.5)
 
-    local screenW, screenH = draw.GetScreenSize()
-    local text = "Velocity: " .. speed
-    local r, g, b, a = velocityColor:GetValue()
+--     local screenW, screenH = draw.GetScreenSize()
+--     local text = "Velocity: " .. speed
+--     local r, g, b, a = velocityColor:GetValue()
 
-    if speed < 10 then
-        r, g, b = 0, 255, 0
-    elseif speed < 120 then
-        r, g, b = 255, 255, 0
-    else
-        r, g, b = 255, 0, 0
-    end
+--     if speed < 10 then
+--         r, g, b = 0, 255, 0
+--     elseif speed < 120 then
+--         r, g, b = 255, 255, 0
+--     else
+--         r, g, b = 255, 0, 0
+--     end
 
-    draw.Color(r, g, b, a)
-    draw.Text(screenW - 150, screenH - 100, text)
-end)
+--     draw.Color(r, g, b, a)
+--     draw.Text(screenW - 150, screenH - 100, text)
+-- end)
