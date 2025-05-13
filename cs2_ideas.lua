@@ -1,5 +1,5 @@
 -- 创建 Visuals 下的新 Tab
-local tabAll = gui.Tab(gui.Reference("Visuals"), "allinone_tab", "All In One ESP")
+local tabAll = gui.Tab(gui.Reference("Visuals"), "allinone_tab", "Sound ESP Plus")
 
 -- Sound ESP 分组
 local groupSoundESP = gui.Groupbox(tabAll, "Sound ESP", 15, 15, 300, 0)
@@ -8,14 +8,14 @@ local guiOnlyHearableSounds = gui.Checkbox(groupSoundESP, "sound_esp_hearable", 
 local guiEnemySounds = gui.Checkbox(groupSoundESP, "sound_esp_enemy", "Show Enemy Sounds", true)
 guiEnemySounds:SetDescription("Visualize enemy player sounds.")
 local guiEnemyColor = gui.ColorPicker(guiEnemySounds, "clr", "Enemy Sound Color", 255, 0, 0, 255)
-local guiFriendlySounds = gui.Checkbox(groupSoundESP, "sound_esp_friendly", "Show Friendly Sounds", true)
+local guiFriendlySounds = gui.Checkbox(groupSoundESP, "sound_esp_friendly", "Show Friendly Sounds", false)
 guiFriendlySounds:SetDescription("Visualize friendly player sounds.")
 local guiFriendlyColor = gui.ColorPicker(groupSoundESP, "clr", "Friendly Sound Color", 0, 255, 255, 255)
 local guiHeadColor = gui.ColorPicker(groupSoundESP, "head_color", "Head Highlight Color", 255, 255, 0, 255)
 local guiHeadSize = gui.Slider(groupSoundESP, "head_size", "Head Highlight Size", 5, 2, 10)
 
-local guiSoundKeepTime = gui.Slider(groupSoundESP, "sound_keep", "Sound Visible Time", 1.0, 0.1, 5.0, 0.1)
-local guiSoundFadeOut = gui.Slider(groupSoundESP, "sound_fade", "Sound Fade-out Time", 2.0, 0.1, 5.0, 0.1)
+local guiSoundKeepTime = gui.Slider(groupSoundESP, "sound_keep", "Sound Visible Time", 2.0, 0.1, 5.0, 0.1)
+local guiSoundFadeOut = gui.Slider(groupSoundESP, "sound_fade", "Sound Fade-out Time", 3.0, 0.1, 5.0, 0.1)
 
 -- Dot Crosshair 分组
 local groupDot = gui.Groupbox(tabAll, "Simple Dot Crosshair", 335, 15, 300, 0)
@@ -25,7 +25,7 @@ local dotSize = gui.Slider(groupDot, "dot_size", "Dot Size", 2, 1, 10, 1)
 
 -- Velocity 分组
 local groupVelocity = gui.Groupbox(tabAll, "Velocity Display", 335, 260, 300, 0)
-local velocityEnabled = gui.Checkbox(groupVelocity, "velocity_show", "Show Velocity", true)
+local velocityEnabled = gui.Checkbox(groupVelocity, "velocity_show", "Show Velocity", false)
 local velocityColor = gui.ColorPicker(groupVelocity, "velocity_color", "Text Color", 255, 255, 255, 255)
 
 -- 工具函数
@@ -39,6 +39,30 @@ local function GetEventPlayerController(ctx, str)
     if not index then return end
     local controller = entities.GetByIndex(index + 1)
     return (controller and controller:GetClass() == "CCSPlayerController") and controller or nil
+end
+
+local function IsVisible(from, to, skip)
+    local skipIndex = skip and skip:GetIndex() or 0
+    local trace = engine.TraceLine(from, to, MASK_VISIBLE, skipIndex)
+    return trace.fraction > 0.97
+end
+
+local function ShouldForceShow(pawn)
+    if not pawn or not pawn:IsAlive() then return false end
+
+    if pawn:GetPropBool("m_bSpotted") then return true end
+    if pawn:GetPropInt("m_iHealth") < 30 then return true end
+
+    local localPlayer = entities.GetLocalPlayer()
+    if localPlayer and localPlayer:IsAlive() then
+        local eyes = localPlayer:GetAbsOrigin() + localPlayer:GetPropVector("m_vecViewOffset")
+        local head = pawn:GetHitboxPosition(0)
+        if head and IsVisible(eyes, head, localPlayer) then
+            return true
+        end
+    end
+
+    return false
 end
 
 -- Sound ESP 存储
@@ -141,6 +165,33 @@ callbacks.Register("Draw", function()
             end
         end
 
+        -- 添加额外显示逻辑
+        local localPlayer = entities.GetLocalPlayer()
+        if localPlayer then
+            for _, entity in pairs(entities.FindByClass("CCSPlayerPawn")) do
+                if entity:IsAlive() and entity:GetIndex() ~= localPlayer:GetIndex() and ShouldForceShow(entity) then
+                    local mins = entity:GetMins()
+                    local maxs = entity:GetMaxs()
+                    local origin = entity:GetAbsOrigin()
+
+                    local top = origin + maxs
+                    local bottom = origin + mins
+                    local x1, y1 = client.WorldToScreen(top)
+                    local x2, y2 = client.WorldToScreen(bottom)
+
+                    if x1 and y1 and x2 and y2 then
+                        local left = math.min(x1, x2) - 10
+                        local right = math.max(x1, x2) + 10
+                        local topY = math.min(y1, y2)
+                        local bottomY = math.max(y1, y2)
+
+                        draw.Color(255, 255, 255, 200)
+                        draw.OutlinedRect(left, topY, right, bottomY)
+                    end
+                end
+            end
+        end
+
         -- 清理无效项
         local i = 1
         while i <= #g_aSounds do
@@ -165,7 +216,7 @@ callbacks.Register("Draw", function()
     end
 end)
 
--- Velocity 显示模块
+-- Velocity 显示
 callbacks.Register("Draw", function()
     if not velocityEnabled:GetValue() then return end
 
