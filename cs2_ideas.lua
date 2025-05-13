@@ -1,54 +1,38 @@
--- 创建 Visuals 下的新 Tab
-local tabAll = gui.Tab(gui.Reference("Visuals"), "allinone_tab", "Sound ESP Plus")
+-- 创建 Sound ESP Plus 界面
+local tab = gui.Tab(gui.Reference("Visuals"), "sound_esp_plus", "Sound ESP Plus")
+local groupSound = gui.Groupbox(tab, "Sound ESP", 15, 15, 300, 0)
+local groupCrosshair = gui.Groupbox(tab, "Dot Crosshair", 335, 15, 300, 0)
 
--- Sound ESP 分组
-local groupSoundESP = gui.Groupbox(tabAll, "Sound ESP", 15, 15, 300, 0)
-local guiSoundESP = gui.Checkbox(groupSoundESP, "sound_esp_enable", "Enable Sound ESP", true)
-local guiOnlyHearableSounds = gui.Checkbox(groupSoundESP, "sound_esp_hearable", "Only Show Hearable Sounds", true)
-local guiEnemySounds = gui.Checkbox(groupSoundESP, "sound_esp_enemy", "Show Enemy Sounds", true)
-guiEnemySounds:SetDescription("Visualize enemy player sounds.")
-local guiEnemyColor = gui.ColorPicker(guiEnemySounds, "clr", "Enemy Sound Color", 0, 255, 0, 255)
-local guiFriendlySounds = gui.Checkbox(groupSoundESP, "sound_esp_friendly", "Show Friendly Sounds", false)
-guiFriendlySounds:SetDescription("Visualize friendly player sounds.")
-local guiFriendlyColor = gui.ColorPicker(groupSoundESP, "clr", "Friendly Sound Color", 0, 255, 255, 255)
+-- 控件
+local enableSoundESP = gui.Checkbox(groupSound, "soundesp_enable", "Enable Sound ESP", true)
+local onlyHearable = gui.Checkbox(groupSound, "soundesp_hear", "Only Hearable", true)
+local showEnemy = gui.Checkbox(groupSound, "soundesp_enemy", "Show Enemy", true)
+local enemyColor = gui.ColorPicker(showEnemy, "enemy_color", "Enemy Color", 255, 0, 0, 255)
+local showFriendly = gui.Checkbox(groupSound, "soundesp_friendly", "Show Friendly", false)
+local friendlyColor = gui.ColorPicker(showFriendly, "friend_color", "Friendly Color", 0, 255, 255, 255)
+local snapline = gui.Checkbox(groupSound, "soundesp_snapline", "Snap Line (Enemy Only)", true)
+local highlightHead = gui.Checkbox(groupSound, "soundesp_head", "Head Highlight", false)
+local headColor = gui.ColorPicker(groupSound, "head_color", "Head Color", 255, 255, 0, 255)
+local headSize = gui.Slider(groupSound, "head_size", "Head Highlight Size", 5, 2, 10)
+local duration = gui.Slider(groupSound, "soundesp_duration", "Box Duration", 2.0, 0.1, 5.0, 0.1)
+local fadeTime = gui.Slider(groupSound, "soundesp_fade", "Fade Time", 2.0, 0.1, 5.0, 0.1)
 
--- Head Highlight 控件
-local guiHeadHighlight = gui.Checkbox(groupSoundESP, "head_highlight_enable", "Enable Head Highlight", false)
-local guiHeadColor = gui.ColorPicker(groupSoundESP, "head_color", "Head Highlight Color", 255, 255, 0, 255)
-local guiHeadSize = gui.Slider(groupSoundESP, "head_size", "Head Highlight Size", 5, 2, 10)
-
--- Snap Line 控件
-local guiSnapLine = gui.Checkbox(groupSoundESP, "snapline_enable", "Enable Snap Line", true)
-
-local guiSoundKeepTime = gui.Slider(groupSoundESP, "sound_keep", "Sound Visible Time", 2.0, 0.1, 5.0, 0.1)
-local guiSoundFadeOut = gui.Slider(groupSoundESP, "sound_fade", "Sound Fade-out Time", 3.0, 0.1, 5.0, 0.1)
-
--- Dot Crosshair 分组
-local groupDot = gui.Groupbox(tabAll, "Simple Dot Crosshair", 335, 15, 300, 0)
-local fDotEnabled = gui.Checkbox(groupDot, "dot_enabled", "Enable Dot Crosshair", true)
-local dotColor = gui.ColorPicker(groupDot, "dot_color", "Dot Color", 0, 255, 0, 255)
-local dotSize = gui.Slider(groupDot, "dot_size", "Dot Size", 2, 1, 10, 1)
+-- Dot Crosshair
+local dotEnabled = gui.Checkbox(groupCrosshair, "dot_enable", "Enable Dot Crosshair", true)
+local dotColor = gui.ColorPicker(groupCrosshair, "dot_color", "Dot Color", 0, 255, 0, 255)
+local dotSize = gui.Slider(groupCrosshair, "dot_size", "Dot Size", 2, 1, 10)
 
 -- 工具函数
-local function AreTeamsEnemies(team1, team2)
-    return client.GetConVar("mp_teammates_are_enemies") or (team1 ~= team2 and team1 > 1 and team2 > 1)
-end
-
-local function GetEventPlayerController(ctx, str)
-    if type(ctx) ~= "userdata" then return end
-    local index = ctx:GetInt(str)
-    if not index then return end
-    local controller = entities.GetByIndex(index + 1)
-    return (controller and controller:GetClass() == "CCSPlayerController") and controller or nil
+local function AreEnemies(t1, t2)
+    return client.GetConVar("mp_teammates_are_enemies") or (t1 ~= t2 and t1 > 1 and t2 > 1)
 end
 
 local function IsVisible(from, to, skip)
-    local skipIndex = skip and skip:GetIndex() or 0
-    local trace = engine.TraceLine(from, to, MASK_VISIBLE, skipIndex)
+    local trace = engine.TraceLine(from, to, MASK_VISIBLE, skip and skip:GetIndex() or 0)
     return trace.fraction > 0.97
 end
 
-local function ShouldForceShow(pawn)
+local function ForceShow(pawn)
     if not pawn or not pawn:IsAlive() then return false end
     if pawn:GetPropBool("m_bSpotted") then return true end
     if pawn:GetPropInt("m_iHealth") < 30 then return true end
@@ -57,146 +41,152 @@ local function ShouldForceShow(pawn)
     if localPlayer and localPlayer:IsAlive() then
         local eyes = localPlayer:GetAbsOrigin() + localPlayer:GetPropVector("m_vecViewOffset")
         local head = pawn:GetHitboxPosition(0)
-        if head and IsVisible(eyes, head, localPlayer) then
-            return true
-        end
+        return head and IsVisible(eyes, head, localPlayer)
     end
-
     return false
 end
 
--- Sound ESP 存储
-local g_aSounds = {}
-client.AllowListener("player_sound")
+-- 声音数据存储
+local soundList = {}
 
-callbacks.Register("FireGameEvent", function(ctx)
-    if ctx:GetName() ~= "player_sound" or not gui.GetValue("esp.master") or not guiSoundESP:GetValue() then return end
+-- 注册声音事件
+client.AllowListener("player_sound")
+callbacks.Register("FireGameEvent", function(event)
+    if event:GetName() ~= "player_sound" or not enableSoundESP:GetValue() then return end
 
     local localPlayer = entities.GetLocalPlayer()
-    local controller = GetEventPlayerController(ctx, "userid")
-    if not localPlayer or not controller then return end
+    if not localPlayer then return end
+
+    local index = event:GetInt("userid") + 1
+    local controller = entities.GetByIndex(index)
+    if not controller or controller:GetClass() ~= "CCSPlayerController" then return end
 
     local pawn = controller:GetPropEntity("m_hPawn")
-    if not pawn or pawn:GetIndex() == localPlayer:GetIndex() then return end
+    if not pawn or not pawn:IsAlive() or pawn:GetIndex() == localPlayer:GetIndex() then return end
 
-    local isEnemy = AreTeamsEnemies(localPlayer:GetTeamNumber(), pawn:GetTeamNumber())
-    if (isEnemy and not guiEnemySounds:GetValue()) or (not isEnemy and not guiFriendlySounds:GetValue()) then return end
+    local isEnemy = AreEnemies(localPlayer:GetTeamNumber(), pawn:GetTeamNumber())
+    if (isEnemy and not showEnemy:GetValue()) or (not isEnemy and not showFriendly:GetValue()) then return end
 
-    local origin = pawn:GetAbsOrigin()
-    local localOrigin = localPlayer:GetAbsOrigin() + localPlayer:GetPropVector("m_vecViewOffset")
-    local distance = (localOrigin - origin):Length()
+    local dist = (localPlayer:GetAbsOrigin() - pawn:GetAbsOrigin()):Length()
+    if onlyHearable:GetValue() and dist > event:GetInt("radius") then return end
 
-    if guiOnlyHearableSounds:GetValue() and distance > ctx:GetInt("radius") then return end
-
-    if pawn:IsAlive() then
-        table.insert(g_aSounds, {
-            m_flTime = globals.CurTime(),
-            m_pPawn = pawn,
-            m_bEnemy = isEnemy
-        })
-    end
+    table.insert(soundList, {
+        time = globals.CurTime(),
+        pawn = pawn,
+        enemy = isEnemy
+    })
 end)
 
--- Draw Callback
+-- 渲染
 callbacks.Register("Draw", function()
-    local g_kDuration = guiSoundKeepTime:GetValue()
-    local g_kFadeOut = guiSoundFadeOut:GetValue()
+    if not enableSoundESP:GetValue() then return end
 
-    if gui.GetValue("esp.master") and guiSoundESP:GetValue() then
-        local curTime = globals.CurTime()
-        local enemyColor = { guiEnemyColor:GetValue() }
-        local friendlyColor = { guiFriendlyColor:GetValue() }
-        local headColor = { guiHeadColor:GetValue() }
-        local headSize = guiHeadSize:GetValue()
+    local now = globals.CurTime()
+    local dur = duration:GetValue()
+    local fade = fadeTime:GetValue()
+    local localPlayer = entities.GetLocalPlayer()
+    if not localPlayer then return end
 
-        for i, data in pairs(g_aSounds) do
-            local delta = curTime - data.m_flTime
-            if delta > (g_kDuration + g_kFadeOut) then
-                g_aSounds[i] = nil
+    -- 处理声音框
+    for i = #soundList, 1, -1 do
+        local data = soundList[i]
+        local pawn = data.pawn
+        local elapsed = now - data.time
+
+        if not pawn or not pawn:IsAlive() or elapsed > (dur + fade) then
+            table.remove(soundList, i)
+        else
+            local fadeAlpha = elapsed > dur and 1.0 - ((elapsed - dur) / fade) or 1.0
+            local color = data.enemy and { enemyColor:GetValue() } or { friendlyColor:GetValue() }
+            local alpha = math.floor(color[4] * fadeAlpha)
+
+            local origin = pawn:GetAbsOrigin()
+            local top = origin + pawn:GetMaxs()
+            local bottom = origin + pawn:GetMins()
+            local x1, y1 = client.WorldToScreen(top)
+            local x2, y2 = client.WorldToScreen(bottom)
+            if x1 and x2 then
+                local left, right = math.min(x1, x2) - 5, math.max(x1, x2) + 5
+                local topY, botY = math.min(y1, y2), math.max(y1, y2)
+
+                draw.Color(color[1], color[2], color[3], alpha)
+                draw.OutlinedRect(left, topY, right, botY)
+
+               
+        -- Snap Line：按距离分级（近红色，远黄色，不显示超远）
+        if data.enemy and snapline:GetValue() then
+            local sx, sy = draw.GetScreenSize()
+            local dist = (origin - localPlayer:GetAbsOrigin()):Length()
+            
+            -- 设置不同距离的分级
+            local closeDist = 1000    -- 近距离，红色
+            local mediumDist = 2000  -- 中等距离，黄色
+        
+            local r, g, b = 0, 0, 0
+            local alphaSnap = 250
+        
+            if dist <= closeDist then
+                -- 近距离（红色）
+                r, g, b = 255, 0, 0
+            elseif dist <= mediumDist then
+                -- 中等距离（黄色）
+                r, g, b = 255, 255, 0
             else
-                local fade = (delta > g_kDuration) and (1.0 - ((delta - g_kDuration) / g_kFadeOut)) or 1.0
-
-                local baseColor = data.m_bEnemy and enemyColor or friendlyColor
-                local r, g, b, a = unpack(baseColor)
-                local alpha = math.floor(a * fade)
-
-                local pawn = data.m_pPawn
-                if pawn and pawn:IsAlive() then
-                    local mins = pawn:GetMins()
-                    local maxs = pawn:GetMaxs()
-                    local origin = pawn:GetAbsOrigin()
-
-                    local top = origin + maxs
-                    local bottom = origin + mins
-                    local x1, y1 = client.WorldToScreen(top)
-                    local x2, y2 = client.WorldToScreen(bottom)
-
-                    if x1 and y1 and x2 and y2 then
-                        local left = math.min(x1, x2) - 10
-                        local right = math.max(x1, x2) + 10
-                        local topY = math.min(y1, y2)
-                        local bottomY = math.max(y1, y2)
-
-                        draw.Color(r, g, b, alpha)
-                        draw.OutlinedRect(left, topY, right, bottomY)
-
-                        -- Snap Line（启用可控）
-                        if guiSnapLine:GetValue() and data.m_bEnemy then
-                            local screenCenterX, screenCenterY = draw.GetScreenSize()
-                            screenCenterX = screenCenterX * 0.5
-                            screenCenterY = screenCenterY * 0.5
-                            draw.Color(255, 0, 0, 100)
-                            draw.Line(x1, y1, screenCenterX, screenCenterY)
-                        end
-
-                        -- Head Highlight
-                        local headPosX, headPosY = client.WorldToScreen(origin + Vector3(0, 0, maxs.z - 5))
-                        if guiHeadHighlight:GetValue() and headPosX and headPosY then
-                            local hr, hg, hb, ha = unpack(headColor)
-                            draw.Color(hr, hg, hb, math.floor(ha * fade * 0.3))
-                            draw.FilledCircle(headPosX, headPosY, headSize + 5)
-                        end
-
-                        -- Health Bar
-                        local health = pawn:GetPropInt("m_iHealth")
-                        local healthPercent = health / 100
-                        local barColor = (healthPercent < 0.3) and {255, 0, 0} or (healthPercent < 0.85) and {255, 255, 0} or {0, 255, 0}
-                        local healthBarHeight = (bottomY - topY) * healthPercent
-
-                        draw.Color(unpack(barColor))
-                        draw.FilledRect(left - 7, bottomY - healthBarHeight, left - 4, bottomY)
-
-                        -- Health Text
-                        local healthTextX, healthTextY = client.WorldToScreen(origin + Vector3(0, 0, maxs.z + 15))
-                        if healthTextX and healthTextY then
-                            draw.Color(255, 255, 255, alpha)
-                            draw.Text(healthTextX - 40, healthTextY, tostring(health) .. " HP")
-                        end
-                    end
-                end
+                -- 远距离，不显示
+                return
             end
+        
+            draw.Color(r, g, b, alphaSnap)
+            draw.Line(sx / 2, sy / 2, x1, y1)
         end
 
-        -- 清理无效项
-        local i = 1
-        while i <= #g_aSounds do
-            if not g_aSounds[i] then
-                table.remove(g_aSounds, i)
-            else
-                i = i + 1
+                -- Head Highlight
+                if highlightHead:GetValue() then
+                    local hx, hy = client.WorldToScreen(origin + Vector3(0, 0, pawn:GetMaxs().z - 5))
+                    if hx and hy then
+                        local hr, hg, hb, ha = headColor:GetValue()
+                        draw.Color(hr, hg, hb, math.floor(ha * fadeAlpha * 0.3))
+                        draw.FilledCircle(hx, hy, headSize:GetValue() + 5)
+                    end
+                end
+
+                -- Health Bar
+                local hp = pawn:GetPropInt("m_iHealth")
+                local hpPct = math.min(hp / 100, 1)
+                local barH = (botY - topY) * hpPct
+                local barColor = (hpPct < 0.3) and {255, 0, 0} or (hpPct < 0.85) and {255, 255, 0} or {0, 255, 0}
+
+                draw.Color(unpack(barColor))
+                draw.FilledRect(left - 6, botY - barH, left - 3, botY)
+
+                draw.Color(255, 255, 255, alpha)
+                local tx, ty = client.WorldToScreen(origin + Vector3(0, 0, pawn:GetMaxs().z + 10))
+                if tx and ty then draw.Text(tx - 15, ty, tostring(hp) .. " HP") end
+            end
+        end
+    end
+
+    -- 强制显示（低血量、雷达、视野中）
+    local players = entities.FindByClass("CCSPlayer")
+    for _, p in pairs(players) do
+        if p:IsAlive() and p:GetIndex() ~= localPlayer:GetIndex() then
+            local isEnemy = AreEnemies(localPlayer:GetTeamNumber(), p:GetTeamNumber())
+            if (isEnemy and showEnemy:GetValue()) or (not isEnemy and showFriendly:GetValue()) then
+                if ForceShow(p) then
+                    table.insert(soundList, {
+                        time = now - 0.01,
+                        pawn = p,
+                        enemy = isEnemy
+                    })
+                end
             end
         end
     end
 
     -- Dot Crosshair
-    if fDotEnabled:GetValue() then
-        local lPlayer = entities.GetLocalPlayer()
-        if lPlayer and lPlayer:GetWeaponType() == 5 then
-            local x, y = draw.GetScreenSize()
-            x = math.floor(x * 0.5)
-            y = math.floor(y * 0.5)
-            draw.Color(dotColor:GetValue())
-            draw.FilledCircle(x, y, dotSize:GetValue())
-        end
+    if dotEnabled:GetValue() and localPlayer:GetWeaponType() == 5 then
+        local x, y = draw.GetScreenSize()
+        draw.Color(dotColor:GetValue())
+        draw.FilledCircle(math.floor(x / 2), math.floor(y / 2), dotSize:GetValue())
     end
 end)
