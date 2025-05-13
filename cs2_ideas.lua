@@ -17,6 +17,9 @@ local guiHeadHighlight = gui.Checkbox(groupSoundESP, "head_highlight_enable", "E
 local guiHeadColor = gui.ColorPicker(groupSoundESP, "head_color", "Head Highlight Color", 255, 255, 0, 255)
 local guiHeadSize = gui.Slider(groupSoundESP, "head_size", "Head Highlight Size", 5, 2, 10)
 
+-- Snap Line 控件
+local guiSnapLine = gui.Checkbox(groupSoundESP, "snapline_enable", "Enable Snap Line", true)
+
 local guiSoundKeepTime = gui.Slider(groupSoundESP, "sound_keep", "Sound Visible Time", 2.0, 0.1, 5.0, 0.1)
 local guiSoundFadeOut = gui.Slider(groupSoundESP, "sound_fade", "Sound Fade-out Time", 3.0, 0.1, 5.0, 0.1)
 
@@ -25,11 +28,6 @@ local groupDot = gui.Groupbox(tabAll, "Simple Dot Crosshair", 335, 15, 300, 0)
 local fDotEnabled = gui.Checkbox(groupDot, "dot_enabled", "Enable Dot Crosshair", true)
 local dotColor = gui.ColorPicker(groupDot, "dot_color", "Dot Color", 0, 255, 0, 255)
 local dotSize = gui.Slider(groupDot, "dot_size", "Dot Size", 2, 1, 10, 1)
-
--- Velocity 分组
--- local groupVelocity = gui.Groupbox(tabAll, "Velocity Display", 335, 260, 300, 0)
--- local velocityEnabled = gui.Checkbox(groupVelocity, "velocity_show", "Show Velocity", false)
--- local velocityColor = gui.ColorPicker(groupVelocity, "velocity_color", "Text Color", 255, 255, 255, 255)
 
 -- 工具函数
 local function AreTeamsEnemies(team1, team2)
@@ -52,7 +50,6 @@ end
 
 local function ShouldForceShow(pawn)
     if not pawn or not pawn:IsAlive() then return false end
-
     if pawn:GetPropBool("m_bSpotted") then return true end
     if pawn:GetPropInt("m_iHealth") < 30 then return true end
 
@@ -100,7 +97,7 @@ callbacks.Register("FireGameEvent", function(ctx)
     end
 end)
 
--- Sound ESP + Dot Crosshair
+-- Draw Callback
 callbacks.Register("Draw", function()
     local g_kDuration = guiSoundKeepTime:GetValue()
     local g_kFadeOut = guiSoundFadeOut:GetValue()
@@ -143,6 +140,16 @@ callbacks.Register("Draw", function()
                         draw.Color(r, g, b, alpha)
                         draw.OutlinedRect(left, topY, right, bottomY)
 
+                        -- Snap Line（启用可控）
+                        if guiSnapLine:GetValue() and data.m_bEnemy then
+                            local screenCenterX, screenCenterY = draw.GetScreenSize()
+                            screenCenterX = screenCenterX * 0.5
+                            screenCenterY = screenCenterY * 0.5
+                            draw.Color(255, 0, 0, 100)
+                            draw.Line(x1, y1, screenCenterX, screenCenterY)
+                        end
+
+                        -- Head Highlight
                         local headPosX, headPosY = client.WorldToScreen(origin + Vector3(0, 0, maxs.z - 5))
                         if guiHeadHighlight:GetValue() and headPosX and headPosY then
                             local hr, hg, hb, ha = unpack(headColor)
@@ -150,6 +157,7 @@ callbacks.Register("Draw", function()
                             draw.FilledCircle(headPosX, headPosY, headSize + 5)
                         end
 
+                        -- Health Bar
                         local health = pawn:GetPropInt("m_iHealth")
                         local healthPercent = health / 100
                         local barColor = (healthPercent < 0.3) and {255, 0, 0} or (healthPercent < 0.85) and {255, 255, 0} or {0, 255, 0}
@@ -158,38 +166,12 @@ callbacks.Register("Draw", function()
                         draw.Color(unpack(barColor))
                         draw.FilledRect(left - 7, bottomY - healthBarHeight, left - 4, bottomY)
 
+                        -- Health Text
                         local healthTextX, healthTextY = client.WorldToScreen(origin + Vector3(0, 0, maxs.z + 15))
                         if healthTextX and healthTextY then
                             draw.Color(255, 255, 255, alpha)
                             draw.Text(healthTextX - 40, healthTextY, tostring(health) .. " HP")
                         end
-                    end
-                end
-            end
-        end
-
-        -- 添加额外显示逻辑
-        local localPlayer = entities.GetLocalPlayer()
-        if localPlayer then
-            for _, entity in pairs(entities.FindByClass("CCSPlayerPawn")) do
-                if entity:IsAlive() and entity:GetIndex() ~= localPlayer:GetIndex() and ShouldForceShow(entity) then
-                    local mins = entity:GetMins()
-                    local maxs = entity:GetMaxs()
-                    local origin = entity:GetAbsOrigin()
-
-                    local top = origin + maxs
-                    local bottom = origin + mins
-                    local x1, y1 = client.WorldToScreen(top)
-                    local x2, y2 = client.WorldToScreen(bottom)
-
-                    if x1 and y1 and x2 and y2 then
-                        local left = math.min(x1, x2) - 10
-                        local right = math.max(x1, x2) + 10
-                        local topY = math.min(y1, y2)
-                        local bottomY = math.max(y1, y2)
-
-                        draw.Color(255, 255, 255, 200)
-                        draw.OutlinedRect(left, topY, right, bottomY)
                     end
                 end
             end
@@ -218,29 +200,3 @@ callbacks.Register("Draw", function()
         end
     end
 end)
-
--- -- Velocity 显示
--- callbacks.Register("Draw", function()
---     if not velocityEnabled:GetValue() then return end
-
---     local localPlayer = entities.GetLocalPlayer()
---     if not localPlayer or not localPlayer:IsAlive() then return end
-
---     local vel = localPlayer:GetPropVector("m_vecVelocity")
---     local speed = math.floor(vel:Length2D() + 0.5)
-
---     local screenW, screenH = draw.GetScreenSize()
---     local text = "Velocity: " .. speed
---     local r, g, b, a = velocityColor:GetValue()
-
---     if speed < 10 then
---         r, g, b = 0, 255, 0
---     elseif speed < 120 then
---         r, g, b = 255, 255, 0
---     else
---         r, g, b = 255, 0, 0
---     end
-
---     draw.Color(r, g, b, a)
---     draw.Text(screenW - 150, screenH - 100, text)
--- end)
