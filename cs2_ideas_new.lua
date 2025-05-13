@@ -25,7 +25,7 @@ local dotSize = gui.Slider(groupDot, "dot_size", "Dot Size", 2, 1, 10, 1)
 
 -- Velocity 分组
 local groupVelocity = gui.Groupbox(tabAll, "Velocity Display", 335, 260, 300, 0)
-local velocityEnabled = gui.Checkbox(groupVelocity, "velocity_show", "Show Velocity", true)
+local velocityEnabled = gui.Checkbox(groupVelocity, "velocity_show", "Show Velocity", false)
 local velocityColor = gui.ColorPicker(groupVelocity, "velocity_color", "Text Color", 255, 255, 255, 255)
 
 -- 工具函数
