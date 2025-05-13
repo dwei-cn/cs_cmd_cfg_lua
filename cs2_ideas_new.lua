@@ -14,8 +14,8 @@ local guiFriendlyColor = gui.ColorPicker(groupSoundESP, "clr", "Friendly Sound C
 local guiHeadColor = gui.ColorPicker(groupSoundESP, "head_color", "Head Highlight Color", 255, 255, 0, 255)
 local guiHeadSize = gui.Slider(groupSoundESP, "head_size", "Head Highlight Size", 5, 2, 10)
 
-local guiSoundKeepTime = gui.Slider(groupSoundESP, "sound_keep", "Sound Visible Time", 1.0, 0.1, 5.0, 0.1)
-local guiSoundFadeOut = gui.Slider(groupSoundESP, "sound_fade", "Sound Fade-out Time", 2.0, 0.1, 5.0, 0.1)
+local guiSoundKeepTime = gui.Slider(groupSoundESP, "sound_keep", "Sound Visible Time", 2.0, 0.1, 5.0, 0.1)
+local guiSoundFadeOut = gui.Slider(groupSoundESP, "sound_fade", "Sound Fade-out Time", 4.0, 0.1, 5.0, 0.1)
 
 -- Dot Crosshair 分组
 local groupDot = gui.Groupbox(tabAll, "Simple Dot Crosshair", 335, 15, 300, 0)
