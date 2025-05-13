@@ -10,11 +10,10 @@ guiEnemySounds:SetDescription("Visualize enemy player sounds.")
 local guiEnemyColor = gui.ColorPicker(guiEnemySounds, "clr", "Enemy Sound Color", 255, 0, 0, 255)
 local guiFriendlySounds = gui.Checkbox(groupSoundESP, "sound_esp_friendly", "Show Friendly Sounds", true)
 guiFriendlySounds:SetDescription("Visualize friendly player sounds.")
-local guiFriendlyColor = gui.ColorPicker(guiFriendlySounds, "clr", "Friendly Sound Color", 0, 255, 255, 255)
+local guiFriendlyColor = gui.ColorPicker(groupSoundESP, "clr", "Friendly Sound Color", 0, 255, 255, 255)
 local guiHeadColor = gui.ColorPicker(groupSoundESP, "head_color", "Head Highlight Color", 255, 255, 0, 255)
 local guiHeadSize = gui.Slider(groupSoundESP, "head_size", "Head Highlight Size", 5, 2, 10)
 
--- 新增：显示时间设置
 local guiSoundKeepTime = gui.Slider(groupSoundESP, "sound_keep", "Sound Visible Time", 1.0, 0.1, 5.0, 0.1)
 local guiSoundFadeOut = gui.Slider(groupSoundESP, "sound_fade", "Sound Fade-out Time", 2.0, 0.1, 5.0, 0.1)
 
@@ -24,12 +23,12 @@ local fDotEnabled = gui.Checkbox(groupDot, "dot_enabled", "Enable Dot Crosshair"
 local dotColor = gui.ColorPicker(groupDot, "dot_color", "Dot Color", 0, 255, 0, 255)
 local dotSize = gui.Slider(groupDot, "dot_size", "Dot Size", 2, 1, 10, 1)
 
--- Velocity Display 分组
+-- Velocity 分组
 local groupVelocity = gui.Groupbox(tabAll, "Velocity Display", 335, 260, 300, 0)
 local velocityEnabled = gui.Checkbox(groupVelocity, "velocity_show", "Show Velocity", true)
 local velocityColor = gui.ColorPicker(groupVelocity, "velocity_color", "Text Color", 255, 255, 255, 255)
 
--- Sound ESP 相关逻辑
+-- 工具函数
 local function AreTeamsEnemies(team1, team2)
     return client.GetConVar("mp_teammates_are_enemies") or (team1 ~= team2 and team1 > 1 and team2 > 1)
 end
@@ -42,27 +41,7 @@ local function GetEventPlayerController(ctx, str)
     return (controller and controller:GetClass() == "CCSPlayerController") and controller or nil
 end
 
-local function GetEnemyTopFragger()
-    local players = entities.FindByClass("CCSPlayerController")
-    local topFragger = nil
-    local topKills = -1
-    local localPlayer = entities.GetLocalPlayer()
-    if not localPlayer then return nil end
-    local myTeam = localPlayer:GetTeamNumber()
-
-    for _, player in pairs(players) do
-        if player:IsValid() and player:GetTeamNumber() ~= myTeam then
-            local kills = player:GetPropInt("m_iKills") or 0
-            if kills > topKills then
-                topKills = kills
-                topFragger = player
-            end
-        end
-    end
-
-    return topFragger
-end
-
+-- Sound ESP 存储
 local g_aSounds = {}
 client.AllowListener("player_sound")
 
@@ -94,14 +73,11 @@ callbacks.Register("FireGameEvent", function(ctx)
     end
 end)
 
-local boxThickness = 3  -- 加粗框框
-
+-- Sound ESP + Dot Crosshair
 callbacks.Register("Draw", function()
-    -- 更新显示时间设置
     local g_kDuration = guiSoundKeepTime:GetValue()
     local g_kFadeOut = guiSoundFadeOut:GetValue()
 
-    -- Sound ESP
     if gui.GetValue("esp.master") and guiSoundESP:GetValue() then
         local curTime = globals.CurTime()
         local enemyColor = { guiEnemyColor:GetValue() }
@@ -114,10 +90,7 @@ callbacks.Register("Draw", function()
             if delta > (g_kDuration + g_kFadeOut) then
                 g_aSounds[i] = nil
             else
-                local fade = 1.0
-                if delta > g_kDuration then
-                    fade = 1.0 - ((delta - g_kDuration) / g_kFadeOut)
-                end
+                local fade = (delta > g_kDuration) and (1.0 - ((delta - g_kDuration) / g_kFadeOut)) or 1.0
 
                 local baseColor = data.m_bEnemy and enemyColor or friendlyColor
                 local r, g, b, a = unpack(baseColor)
@@ -131,7 +104,6 @@ callbacks.Register("Draw", function()
 
                     local top = origin + maxs
                     local bottom = origin + mins
-
                     local x1, y1 = client.WorldToScreen(top)
                     local x2, y2 = client.WorldToScreen(bottom)
 
@@ -141,23 +113,8 @@ callbacks.Register("Draw", function()
                         local topY = math.min(y1, y2)
                         local bottomY = math.max(y1, y2)
 
-                        -- 高亮包匪和top fragger（绿色框框）
-                        local drawR, drawG, drawB = r, g, b  -- 默认使用敌我颜色
-                        local c4 = pawn:GetPropBool("m_bHasC4")
-                        local topFragger = GetEnemyTopFragger()
-                        local controller = pawn:GetPlayerController()
-
-                        if c4 then
-                            drawR, drawG, drawB = 0, 255, 0  -- 绿色框框表示包匪
-                        elseif topFragger and controller and controller:GetIndex() == topFragger:GetIndex() then
-                            drawR, drawG, drawB = 0, 255, 0  -- 绿色框框表示top fragger
-                        end
-
-                        draw.Color(drawR, drawG, drawB, alpha)
-                        -- 加粗框框
-                        for t = 0, boxThickness - 1 do
-                            draw.OutlinedRect(left - t, topY - t, right + t, bottomY + t)
-                        end
+                        draw.Color(r, g, b, alpha)
+                        draw.OutlinedRect(left, topY, right, bottomY)
 
                         local headPosX, headPosY = client.WorldToScreen(origin + Vector3(0, 0, maxs.z - 5))
                         if headPosX and headPosY then
@@ -165,32 +122,71 @@ callbacks.Register("Draw", function()
                             draw.Color(hr, hg, hb, math.floor(ha * fade * 0.3))
                             draw.FilledCircle(headPosX, headPosY, headSize + 5)
                         end
+
+                        local health = pawn:GetPropInt("m_iHealth")
+                        local healthPercent = health / 100
+                        local barColor = (healthPercent < 0.3) and {255, 0, 0} or (healthPercent < 0.85) and {255, 255, 0} or {0, 255, 0}
+                        local healthBarHeight = (bottomY - topY) * healthPercent
+
+                        draw.Color(unpack(barColor))
+                        draw.FilledRect(left - 7, bottomY - healthBarHeight, left - 4, bottomY)
+
+                        local healthTextX, healthTextY = client.WorldToScreen(origin + Vector3(0, 0, maxs.z + 15))
+                        if healthTextX and healthTextY then
+                            draw.Color(255, 255, 255, alpha)
+                            draw.Text(healthTextX - 40, healthTextY, tostring(health) .. " HP")
+                        end
                     end
                 end
             end
         end
+
+        -- 清理无效项
+        local i = 1
+        while i <= #g_aSounds do
+            if not g_aSounds[i] then
+                table.remove(g_aSounds, i)
+            else
+                i = i + 1
+            end
+        end
     end
 
-    -- Velocity Display
-    if velocityEnabled:GetValue() then
-        local localPlayer = entities.GetLocalPlayer()
-        if not localPlayer or not localPlayer:IsAlive() then return end
-        local vel = localPlayer:GetPropVector("m_vecVelocity")
-        local speed = math.floor(vel:Length2D() + 0.5)
-        local screenW, screenH = draw.GetScreenSize()
-        local text = "Velocity: " .. speed
-        local r, g, b, a = velocityColor:GetValue()
-        
-        -- 根据速度自动变色
-        if speed < 10 then
-            r, g, b = 0, 255, 0 -- 静止：绿色
-        elseif speed < 120 then
-            r, g, b = 255, 255, 0 -- 缓慢移动：黄色
-        else
-            r, g, b = 255, 0, 0 -- 快速移动：红色
+    -- Dot Crosshair
+    if fDotEnabled:GetValue() then
+        local lPlayer = entities.GetLocalPlayer()
+        if lPlayer and lPlayer:GetWeaponType() == 5 then
+            local x, y = draw.GetScreenSize()
+            x = math.floor(x * 0.5)
+            y = math.floor(y * 0.5)
+            draw.Color(dotColor:GetValue())
+            draw.FilledCircle(x, y, dotSize:GetValue())
         end
-        
-        draw.Color(r, g, b, a)
-        draw.Text(screenW - 150, screenH - 100, text)
     end
+end)
+
+-- Velocity 显示模块
+callbacks.Register("Draw", function()
+    if not velocityEnabled:GetValue() then return end
+
+    local localPlayer = entities.GetLocalPlayer()
+    if not localPlayer or not localPlayer:IsAlive() then return end
+
+    local vel = localPlayer:GetPropVector("m_vecVelocity")
+    local speed = math.floor(vel:Length2D() + 0.5)
+
+    local screenW, screenH = draw.GetScreenSize()
+    local text = "Velocity: " .. speed
+    local r, g, b, a = velocityColor:GetValue()
+
+    if speed < 10 then
+        r, g, b = 0, 255, 0
+    elseif speed < 120 then
+        r, g, b = 255, 255, 0
+    else
+        r, g, b = 255, 0, 0
+    end
+
+    draw.Color(r, g, b, a)
+    draw.Text(screenW - 150, screenH - 100, text)
 end)
