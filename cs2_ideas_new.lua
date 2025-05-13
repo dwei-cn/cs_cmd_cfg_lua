@@ -1,5 +1,5 @@
 -- 创建 Visuals 下的新 Tab
-local tabAll = gui.Tab(gui.Reference("Visuals"), "allinone_tab", "All In One ESP")
+local tabAll = gui.Tab(gui.Reference("Visuals"), "allinone_tab", "Sound ESP Plus")
 
 -- Sound ESP 分组
 local groupSoundESP = gui.Groupbox(tabAll, "Sound ESP", 15, 15, 300, 0)
