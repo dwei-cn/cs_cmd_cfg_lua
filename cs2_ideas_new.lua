@@ -189,4 +189,4 @@ callbacks.Register("Draw", function()
 
     draw.Color(r, g, b, a)
     draw.Text(screenW - 150, screenH - 100, text)
-end)  改良我的代码,在我hearable模式里面,我听到看到或者队友看到的,都显示框框
+end)
