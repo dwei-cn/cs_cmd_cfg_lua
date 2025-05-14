@@ -1,4 +1,4 @@
--- Sound ESP Plus 优化版本
+-- Sound ESP Plus 优化版：支持敌人在你或队友雷达上（spotbymask）也显示框框
 
 -- 创建 UI
 local tab = gui.Tab(gui.Reference("Visuals"), "sound_esp_plus", "Sound ESP Plus")
@@ -34,24 +34,25 @@ local function IsVisible(from, to, skip)
     return trace.fraction > 0.97
 end
 
-local function ForceShow(pawn)
-    if not pawn or not pawn:IsAlive() then return false end
+-- 检查pawn是否被本地玩家或队友spotbymask
+local function IsSpottedByAnyTeammate(pawn)
     local localPlayer = entities.GetLocalPlayer()
-    if not localPlayer then return false end
-
+    if not pawn or not localPlayer then return false end
+    local team = localPlayer:GetTeamNumber()
+    local players = entities.FindByClass("CCSPlayer")
     local spottedMask = pawn:GetProp("m_entitySpottedState.m_bSpottedByMask")
-    if spottedMask and type(spottedMask) == "table" then
-        local localIdx = localPlayer:GetIndex() - 1
-        local maskIndex = math.floor(localIdx / 32) + 1
-        local bitPos = localIdx % 32
-        if bit.band(spottedMask[maskIndex], bit.lshift(1, bitPos)) ~= 0 then return true end
+    if not spottedMask or type(spottedMask) ~= "table" then return false end
+    for _, teammate in ipairs(players) do
+        if teammate:IsAlive() and teammate:GetTeamNumber() == team then
+            local idx = teammate:GetIndex() - 1
+            local maskIndex = math.floor(idx / 32) + 1
+            local bitPos = idx % 32
+            if bit.band(spottedMask[maskIndex], bit.lshift(1, bitPos)) ~= 0 then
+                return true
+            end
+        end
     end
-
-    if pawn:GetPropInt("m_iHealth") < 30 then return true end
-
-    local eyes = localPlayer:GetAbsOrigin() + localPlayer:GetPropVector("m_vecViewOffset")
-    local head = pawn:GetHitboxPosition(0)
-    return head and IsVisible(eyes, head, localPlayer)
+    return false
 end
 
 -- 活跃玩家表
@@ -89,6 +90,20 @@ callbacks.Register("Draw", function()
 
     local lpPos = localPlayer:GetAbsOrigin()
     local screenW, screenH = draw.GetScreenSize()
+
+    -- spotbymask: 让所有被自己或队友spot的敌人也能显示
+    local team = localPlayer:GetTeamNumber()
+    local players = entities.FindByClass("CCSPlayer")
+    for _, p in ipairs(players) do
+        if p:IsAlive() and AreEnemies(team, p:GetTeamNumber()) then
+            if IsSpottedByAnyTeammate(p) then
+                local id = p:GetIndex()
+                if not activePawns[id] then
+                    activePawns[id] = { time = now, pawn = p, enemy = true }
+                end
+            end
+        end
+    end
 
     -- 清理过期
     for id, data in pairs(activePawns) do
