@@ -39,7 +39,6 @@ local function ForceShow(pawn)
     local localPlayer = entities.GetLocalPlayer()
     if not localPlayer then return false end
 
-    -- 雷达上被看到
     local spottedMask = pawn:GetProp("m_entitySpottedState.m_bSpottedByMask")
     if spottedMask and type(spottedMask) == "table" then
         local localIdx = localPlayer:GetIndex() - 1
@@ -48,19 +47,17 @@ local function ForceShow(pawn)
         if bit.band(spottedMask[maskIndex], bit.lshift(1, bitPos)) ~= 0 then return true end
     end
 
-    -- 低血量
     if pawn:GetPropInt("m_iHealth") < 30 then return true end
 
-    -- 可视范围
     local eyes = localPlayer:GetAbsOrigin() + localPlayer:GetPropVector("m_vecViewOffset")
     local head = pawn:GetHitboxPosition(0)
     return head and IsVisible(eyes, head, localPlayer)
 end
 
--- 优化后的数据结构：活跃的玩家（包含敌人和友军）
+-- 活跃玩家表
 local activePawns = {}
 
--- 注册声音事件
+-- 声音事件
 client.AllowListener("player_sound")
 callbacks.Register("FireGameEvent", function(event)
     if event:GetName() ~= "player_sound" or not enableSoundESP:GetValue() then return end
@@ -79,12 +76,10 @@ callbacks.Register("FireGameEvent", function(event)
     local dist = (localPlayer:GetAbsOrigin() - pawn:GetAbsOrigin()):Length()
     if onlyHearable:GetValue() and dist > event:GetInt("radius") then return end
 
-    -- 仅保存活跃玩家信息
-    local id = pawn:GetIndex()
-    activePawns[id] = { time = globals.CurTime(), pawn = pawn, enemy = isEnemy }
+    activePawns[pawn:GetIndex()] = { time = globals.CurTime(), pawn = pawn, enemy = isEnemy }
 end)
 
--- 绘制 ESP
+-- 绘制
 callbacks.Register("Draw", function()
     if not enableSoundESP:GetValue() then return end
     local now = globals.CurTime()
@@ -95,7 +90,7 @@ callbacks.Register("Draw", function()
     local lpPos = localPlayer:GetAbsOrigin()
     local screenW, screenH = draw.GetScreenSize()
 
-    -- 清理过期玩家
+    -- 清理过期
     for id, data in pairs(activePawns) do
         local elapsed = now - data.time
         if not data.pawn or not data.pawn:IsAlive() or elapsed > (dur + fade) then
@@ -103,63 +98,67 @@ callbacks.Register("Draw", function()
         end
     end
 
-    -- 绘制框框
     for id, data in pairs(activePawns) do
         local pawn = data.pawn
         local elapsed = now - data.time
+        if not pawn then goto continue end
 
-        if pawn then
-            local fadeAlpha = elapsed > dur and 1.0 - ((elapsed - dur) / fade) or 1.0
-            local enemyColorR, enemyColorG, enemyColorB, enemyColorA = enemyColor:GetValue()
-            local friendlyColorR, friendlyColorG, friendlyColorB, friendlyColorA = friendlyColor:GetValue()
-            local color = data.enemy and {enemyColorR, enemyColorG, enemyColorB, enemyColorA} or {friendlyColorR, friendlyColorG, friendlyColorB, friendlyColorA}
-            local alpha = math.floor(color[4] * fadeAlpha)
+        -- 提前获取世界坐标与屏幕坐标
+        local origin = pawn:GetAbsOrigin()
+        local mins, maxs = pawn:GetMins(), pawn:GetMaxs()
+        local top3D, bot3D = origin + maxs, origin + mins
+        local x1, y1 = client.WorldToScreen(top3D)
+        local x2, y2 = client.WorldToScreen(bot3D)
 
-            local origin = pawn:GetAbsOrigin()
-            local top, bottom = origin + pawn:GetMaxs(), origin + pawn:GetMins()
-            local x1, y1 = client.WorldToScreen(top)
-            local x2, y2 = client.WorldToScreen(bottom)
+        if not (x1 and x2) then goto continue end
 
-            if x1 and x2 then
-                local left, right = math.min(x1, x2) - 5, math.max(x1, x2) + 5
-                local topY, botY = math.min(y1, y2), math.max(y1, y2)
+        -- 算 alpha
+        local fadeAlpha = elapsed > dur and 1.0 - ((elapsed - dur) / fade) or 1.0
+        local r, g, b, a
+        if data.enemy then r, g, b, a = enemyColor:GetValue() else r, g, b, a = friendlyColor:GetValue() end
+        local alpha = math.floor(a * fadeAlpha)
 
-                draw.Color(color[1], color[2], color[3], alpha)
-                draw.OutlinedRect(left, topY, right, botY)
+        local left, right = math.min(x1, x2) - 5, math.max(x1, x2) + 5
+        local topY, botY = math.min(y1, y2), math.max(y1, y2)
 
-                -- Snapline
-                if data.enemy and snapline:GetValue() then
-                    local dist = (origin - lpPos):Length()
-                    if dist <= 2500 then
-                        draw.Color(255, 0, 0, 250)
-                        draw.Line(screenW / 2, screenH / 2, x1, y1)
-                    end
-                end
+        draw.Color(r, g, b, alpha)
+        draw.OutlinedRect(left, topY, right, botY)
 
-                -- Head highlight
-                if highlightHead:GetValue() then
-                    local hx, hy = client.WorldToScreen(origin + Vector3(0, 0, pawn:GetMaxs().z - 5))
-                    if hx and hy then
-                        local hr, hg, hb, ha = headColor:GetValue()
-                        draw.Color(hr, hg, hb, math.floor(ha * fadeAlpha * 0.3))
-                        draw.FilledCircle(hx, hy, headSize:GetValue() + 5)
-                    end
-                end
-
-                -- Health Bar
-                local hp = pawn:GetPropInt("m_iHealth")
-                local hpPct = math.max(0, math.min(hp / 100, 1))
-                local barH = (botY - topY) * hpPct
-                local barColor = (hpPct < 0.3) and {255, 0, 0} or (hpPct < 0.85) and {255, 255, 0} or {0, 255, 0}
-
-                draw.Color(unpack(barColor))
-                draw.FilledRect(left - 6, botY - barH, left - 3, botY)
-
-                draw.Color(255, 255, 255, alpha)
-                local tx, ty = client.WorldToScreen(origin + Vector3(0, 0, pawn:GetMaxs().z + 10))
-                if tx and ty then draw.Text(tx - 15, ty, tostring(hp) .. " HP") end
+        -- Snapline
+        if data.enemy and snapline:GetValue() then
+            local dist = (origin - lpPos):Length()
+            if dist <= 2500 then
+                draw.Color(255, 0, 0, 250)
+                draw.Line(screenW / 2, screenH / 2, x1, y1)
             end
         end
+
+        -- Head highlight
+        if highlightHead:GetValue() then
+            local hx, hy = client.WorldToScreen(origin + Vector3(0, 0, maxs.z - 5))
+            if hx and hy then
+                local hr, hg, hb, ha = headColor:GetValue()
+                draw.Color(hr, hg, hb, math.floor(ha * fadeAlpha * 0.3))
+                draw.FilledCircle(hx, hy, headSize:GetValue() + 5)
+            end
+        end
+
+        -- Health bar
+        local hp = pawn:GetPropInt("m_iHealth")
+        local hpPct = math.max(0, math.min(hp / 100, 1))
+        local barH = (botY - topY) * hpPct
+        local barColor = (hpPct < 0.3) and {255, 0, 0} or (hpPct < 0.85) and {255, 255, 0} or {0, 255, 0}
+        draw.Color(unpack(barColor))
+        draw.FilledRect(left - 6, botY - barH, left - 3, botY)
+
+        -- HP text
+        local tx, ty = client.WorldToScreen(origin + Vector3(0, 0, maxs.z + 10))
+        if tx and ty then
+            draw.Color(255, 255, 255, alpha)
+            draw.Text(tx - 15, ty, tostring(hp) .. " HP")
+        end
+
+        ::continue::
     end
 
     -- Dot Crosshair
