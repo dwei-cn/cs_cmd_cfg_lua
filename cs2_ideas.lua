@@ -1,15 +1,14 @@
--- Sound ESP Plus 优化版：支持敌人在你或队友雷达上（spotbymask）也显示框框
+-- Sound ESP Plus 优化版（含legit触发：开枪、换弹、开镜、安包/拆包、被击中、被闪/HE/燃烧等）
 
 -- 创建 UI
 local tab = gui.Tab(gui.Reference("Visuals"), "sound_esp_plus", "Sound ESP Plus")
 local groupSound = gui.Groupbox(tab, "Sound ESP", 15, 15, 300, 0)
 local groupCrosshair = gui.Groupbox(tab, "Dot Crosshair", 335, 15, 300, 0)
 
--- 控件
 local enableSoundESP = gui.Checkbox(groupSound, "soundesp_enable", "Enable Sound ESP", true)
 local onlyHearable = gui.Checkbox(groupSound, "soundesp_hear", "Only Hearable", true)
 local showEnemy = gui.Checkbox(groupSound, "soundesp_enemy", "Show Enemy", true)
-local enemyColor = gui.ColorPicker(showEnemy, "enemy_color", "Enemy Color", 255, 0, 0, 255)
+local enemyColor = gui.ColorPicker(showEnemy, "enemy_color", "Enemy Color", 0, 250, 0, 255)
 local showFriendly = gui.Checkbox(groupSound, "soundesp_friendly", "Show Friendly", false)
 local friendlyColor = gui.ColorPicker(showFriendly, "friend_color", "Friendly Color", 0, 255, 255, 255)
 local snapline = gui.Checkbox(groupSound, "soundesp_snapline", "Snap Line (Enemy Only)", true)
@@ -19,12 +18,10 @@ local headSize = gui.Slider(groupSound, "head_size", "Head Highlight Size", 5, 2
 local duration = gui.Slider(groupSound, "soundesp_duration", "Box Duration", 2.0, 0.1, 5.0, 0.1)
 local fadeTime = gui.Slider(groupSound, "soundesp_fade", "Fade Time", 3.0, 0.1, 5.0, 0.1)
 
--- Dot Crosshair
 local dotEnabled = gui.Checkbox(groupCrosshair, "dot_enable", "Enable Dot Crosshair", true)
 local dotColor = gui.ColorPicker(groupCrosshair, "dot_color", "Dot Color", 0, 255, 0, 255)
 local dotSize = gui.Slider(groupCrosshair, "dot_size", "Dot Size", 2, 1, 10)
 
--- 工具函数
 local function AreEnemies(t1, t2)
     return client.GetConVar("mp_teammates_are_enemies") or (t1 ~= t2 and t1 > 1 and t2 > 1)
 end
@@ -55,17 +52,40 @@ local function IsSpottedByAnyTeammate(pawn)
     return false
 end
 
--- 活跃玩家表
 local activePawns = {}
 
--- 声音事件
+-- legit事件表
+local legit_events = {
+    weapon_fire = true,
+    weapon_reload = true,
+    weapon_zoom = true,           -- 开镜
+    bomb_beginplant = true,
+    bomb_begindefuse = true,
+    player_hurt = true,
+    player_blind = true,
+    inferno_startburn = true,     -- 燃烧弹
+    hegrenade_detonate = true,    -- HE
+    flashbang_detonate = true,    -- 闪光
+    smokegrenade_detonate = true, -- 烟雾
+}
+
+-- 注册所有事件
+for eventName in pairs(legit_events) do
+    client.AllowListener(eventName)
+end
 client.AllowListener("player_sound")
-callbacks.Register("FireGameEvent", function(event)
-    if event:GetName() ~= "player_sound" or not enableSoundESP:GetValue() then return end
+
+local function tryAddPawnFromEvent(event, isHurt)
     local localPlayer = entities.GetLocalPlayer()
     if not localPlayer then return end
 
-    local index = event:GetInt("userid") + 1
+    local index
+    if isHurt then
+        index = event:GetInt("attacker") + 1
+    else
+        index = event:GetInt("userid") + 1
+    end
+
     local controller = entities.GetByIndex(index)
     if not controller or controller:GetClass() ~= "CCSPlayerController" then return end
     local pawn = controller:GetPropEntity("m_hPawn")
@@ -74,13 +94,38 @@ callbacks.Register("FireGameEvent", function(event)
     local isEnemy = AreEnemies(localPlayer:GetTeamNumber(), pawn:GetTeamNumber())
     if (isEnemy and not showEnemy:GetValue()) or (not isEnemy and not showFriendly:GetValue()) then return end
 
-    local dist = (localPlayer:GetAbsOrigin() - pawn:GetAbsOrigin()):Length()
-    if onlyHearable:GetValue() and dist > event:GetInt("radius") then return end
-
     activePawns[pawn:GetIndex()] = { time = globals.CurTime(), pawn = pawn, enemy = isEnemy }
+end
+
+callbacks.Register("FireGameEvent", function(event)
+    local name = event:GetName()
+    if not enableSoundESP:GetValue() then return end
+
+    if name == "player_sound" then
+        local localPlayer = entities.GetLocalPlayer()
+        if not localPlayer then return end
+
+        local index = event:GetInt("userid") + 1
+        local controller = entities.GetByIndex(index)
+        if not controller or controller:GetClass() ~= "CCSPlayerController" then return end
+        local pawn = controller:GetPropEntity("m_hPawn")
+        if not pawn or not pawn:IsAlive() or pawn:GetIndex() == localPlayer:GetIndex() then return end
+
+        local isEnemy = AreEnemies(localPlayer:GetTeamNumber(), pawn:GetTeamNumber())
+        if (isEnemy and not showEnemy:GetValue()) or (not isEnemy and not showFriendly:GetValue()) then return end
+
+        local dist = (localPlayer:GetAbsOrigin() - pawn:GetAbsOrigin()):Length()
+        if onlyHearable:GetValue() and dist > event:GetInt("radius") then return end
+
+        activePawns[pawn:GetIndex()] = { time = globals.CurTime(), pawn = pawn, enemy = isEnemy }
+        return
+    end
+
+    if legit_events[name] then
+        tryAddPawnFromEvent(event, name == "player_hurt")
+    end
 end)
 
--- 绘制
 callbacks.Register("Draw", function()
     if not enableSoundESP:GetValue() then return end
     local now = globals.CurTime()
@@ -118,16 +163,13 @@ callbacks.Register("Draw", function()
         local elapsed = now - data.time
         if not pawn then goto continue end
 
-        -- 提前获取世界坐标与屏幕坐标
         local origin = pawn:GetAbsOrigin()
         local mins, maxs = pawn:GetMins(), pawn:GetMaxs()
         local top3D, bot3D = origin + maxs, origin + mins
         local x1, y1 = client.WorldToScreen(top3D)
         local x2, y2 = client.WorldToScreen(bot3D)
-
         if not (x1 and x2) then goto continue end
 
-        -- 算 alpha
         local fadeAlpha = elapsed > dur and 1.0 - ((elapsed - dur) / fade) or 1.0
         local r, g, b, a
         if data.enemy then r, g, b, a = enemyColor:GetValue() else r, g, b, a = friendlyColor:GetValue() end
