@@ -3,7 +3,7 @@
 local tab = gui.Tab(gui.Reference("Visuals"), "legit_aa_tab", "Legit Anti-Aim")
 local group = gui.Groupbox(tab, "Legit Anti-Aim Options", 15, 15, 300, 0)
 
-local master = gui.Checkbox(group, "legitaa_enable", "Enable Legit Anti-Aim", false)
+local master = gui.Checkbox(group, "legitaa_enable", "Enable Legit Anti-Aim", true)
 local desync = gui.Checkbox(group, "legitaa_desync", "Small Desync (Yaw Offset)", true)
 local jitter = gui.Checkbox(group, "legitaa_jitter", "Micro Jitter", true)
 local jitter_range = gui.Slider(group, "legitaa_jitter_range", "Jitter Range (°)", 10, 1, 30)
