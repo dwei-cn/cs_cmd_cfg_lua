@@ -56,17 +56,33 @@ local activePawns = {}
 
 -- legit事件表
 local legit_events = {
-    weapon_fire = true,
-    weapon_reload = true,
-    weapon_zoom = true,           -- 开镜
-    bomb_beginplant = true,
-    bomb_begindefuse = true,
-    player_hurt = true,
-    player_blind = true,
-    inferno_startburn = true,     -- 燃烧弹
-    hegrenade_detonate = true,    -- HE
-    flashbang_detonate = true,    -- 闪光
-    smokegrenade_detonate = true, -- 烟雾
+    -- ★★★★★ 最高legit推荐
+    weapon_fire = true,            -- 开枪
+    weapon_reload = true,          -- 换弹
+    weapon_zoom = true,            -- 开镜
+    player_hurt = true,            -- 被击中
+    inferno_startburn = true,      -- 燃烧弹点燃
+    bomb_beginplant = true,        -- 安包
+    bomb_begindefuse = true,       -- 拆包
+
+    -- ★★★★ 适度legit
+    player_footstep = true,        -- 脚步声
+    player_jump = true,            -- 跳跃
+    player_land = true,            -- 落地
+    player_falldamage = true,      -- 摔伤
+    item_pickup = true,            -- 捡起武器/道具
+    item_drop = true,              -- 丢弃武器/道具
+    water_enter = true,            -- 进入水体
+    water_leave = true,            -- 离开水体
+    hostage_pickup = true,         -- 挟持人质
+    hostage_rescued = true,        -- 救援人质
+    door_moving = true,            -- 门移动
+
+    -- ★ 低legit性（建议注释留作参考）
+    -- player_blind = true,           -- 被闪（不推荐，听觉难判断）
+    -- hegrenade_detonate = true,     -- HE（不推荐，声音不明显）
+    -- flashbang_detonate = true,     -- 闪光（不推荐，声音不明显）
+    -- smokegrenade_detonate = true,  -- 烟雾（不推荐，声音不明显）
 }
 
 -- 注册所有事件
