@@ -4,9 +4,8 @@ local box = gui.Groupbox(tab, "Quick Turn Settings", 16, 16, 260, 170)
 local enable = gui.Checkbox(box, "quickturn.enable", "Enable Quick Turn", True) 
 local keybox_left = gui.Keybox(box, "quickturn.leftkey", "Turn Right Key", 0) 
 local keybox_right = gui.Keybox(box, "quickturn.rightkey", "Turn Left Key", 0) 
-local step_slider = gui.Slider(box, "quickturn.stepsize", "Angle Per Frame", 1, 0, 5)
-local total_slider = gui.Slider(box, "quickturn.totalangle", "Total Turn Angle", 5, 0, 45)
-gui.Text(box, "Tip: Mouse wheel up is 0x20, down is 0x21")
+local step_slider = gui.Slider(box, "quickturn.stepsize", "Angle Per Frame", 15, 0, 45)
+local total_slider = gui.Slider(box, "quickturn.totalangle", "Total Turn Angle", 45, 0, 90)
 
 local turning = false
 local direction = 0 -- -1 for left, 1 for right
