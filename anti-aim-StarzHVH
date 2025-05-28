@@ -1,0 +1,816 @@
+-- source: https://aimware.net/forum/thread/178777
+
+--------------------- GLOBALS ------------------------
+function table.contains(tbl, value)
+    for _, v in ipairs(tbl) do
+        if v == value then
+            return true
+        end
+    end
+    return false
+end
+
+local function guiModify(guiObject, x, y, width)
+    if not guiObject then return end
+    if x then guiObject:SetPosX(x) end
+    if y then guiObject:SetPosY(y) end
+    if width then guiObject:SetWidth(width) end
+end
+
+local jitter_timer = globals.RealTime()
+local crabwalk_timer = globals.RealTime()
+local slwwlk_timer = globals.RealTime()
+local freestand_ltimer = globals.RealTime()
+local freestand_rtimer = globals.RealTime()
+local current_jitter_angle = 0
+local current_slowwalk_speed = 0
+local current_crabwalk_angle = 0
+local current_freestand_langle = 0
+local current_freestand_rangle = 0
+
+local activeMenu = 0
+local activeState = 0
+local bTabClicked = true
+local moving = false
+local slowwalking = false
+local freestanding_val = false
+
+local nades = { 42, 43, 44, 45, 46, 48 }
+
+
+local menus = {
+    standing = 0,
+    moving = 1,
+    freestand = 2,
+    slowwalk = 3
+}
+--------------------- GLOBALS ------------------------
+
+------------------------- UI ----------------------------------------------
+local aaWindow = gui.Window("aaWindow", "Starz-AA", 150, 150, 425, 630)
+aaWindow:SetOpenKey(45)
+
+local tab_section = gui.Groupbox(aaWindow, " ", 10,10,410,400)
+local tab_stand = gui.Groupbox(tab_section, " ", 0,0,380,400)
+local tab_move = gui.Groupbox(tab_section, " ", 0,0,380,400)
+local tab_fs = gui.Groupbox(tab_section, " ", 0,0,380,400)
+local tab_sw_left = gui.Groupbox(tab_section, " ", 0,0,190,400)
+local tab_sw_right = gui.Groupbox(tab_section, " ", 200,0,190,400)
+
+local STANDING_BTN = gui.Button(tab_section, "Standing", function()
+    activeMenu = 0
+    bTabClicked = true
+
+end)
+guiModify(STANDING_BTN, 0, -42, 90)
+
+local MOVING_BTN = gui.Button( tab_section, "Moving", function()
+    activeMenu = 1
+    bTabClicked = true
+
+end)
+guiModify(MOVING_BTN, 100, -42, 90)
+
+local FREESTAND_BTN = gui.Button( tab_section, "FS", function()
+    activeMenu = 2
+    bTabClicked = true
+
+end)
+guiModify(FREESTAND_BTN, 200, -42, 90)
+
+local Slowwalk_BTN = gui.Button( tab_section, "SW", function()
+    activeMenu = 3
+    bTabClicked = true
+end)
+guiModify(Slowwalk_BTN, 300, -42, 90)
+
+-------------------------------STANDING---------------------------------
+    local standing_text = gui.Text(tab_stand, "Standing AA")
+    local aaEnable = gui.Checkbox(tab_stand, "enable_aa", "Enable AA", false)
+    local shared = gui.Checkbox(tab_stand, "shared_aa", "Shared AA", false)
+
+    local standing_cust_pitch = gui.Checkbox(tab_stand, "standing_cust_pitch", "Custom Pitch", false)
+    local standing_pitch = gui.Slider(tab_stand, "standing_pitch", "Pitch Value", 0, -89, 89)
+    local standing_jitterpitch = gui.Checkbox(tab_stand, "standing_jitterpitch", "Jitter Pitch", false)
+
+    local standing_mode_combobox = gui.Combobox(tab_stand, "standing_mode_combobox", "Mode", "Off", "Jitter", "Crabwalk AA", "Static")
+
+    local standing_jitter_angle1 = gui.Slider(tab_stand, "standing_jitter_angle1", "Jitter Angle 1", -180, -180, 180)
+    local standing_jitter_angle2 = gui.Slider(tab_stand, "standing_jitter_angle2", "Jitter Angle 2", 180, -180, 180)
+    local standing_jitter_speed = gui.Slider(tab_stand, "standing_jitter_speed", "Jitter Speed", 3, 1, 10)
+    local standing_jitter_flip = gui.Checkbox(tab_stand, "standing_jitter_flip", "Flip Jitter Direction", false)
+
+    local standing_jitter_crab = gui.Slider(tab_stand, "standing_jitter_crab", "Crab AA Speed", 3, 1, 10)
+
+    local standing_static_slider = gui.Slider(tab_stand, "standing_static_slider", "Static Value", 0, -180, 180)
+
+    local standing_static_flip = gui.Checkbox(tab_stand, "standing_static_flip", "Flip Direction", false)
+    local standing_static_center = gui.Checkbox(tab_stand, "standing_static_center", "Center Direction", false)
+    standing_mode_combobox:SetDescription("Select the mode for the anti-aim.")
+    standing_jitter_angle1:SetDescription("The first jitter angle value")
+    standing_jitter_angle2:SetDescription("The second jitter angle value")
+    standing_jitter_speed:SetDescription("Adjust the speed of the jitter.")
+    standing_static_slider:SetDescription("The static value for angle.")
+-------------------------------STANDING---------------------------------
+
+
+-------------------------------MOVING---------------------------------
+    local moving_text = gui.Text(tab_move, "Moving AA")
+    local moving_cust_pitch = gui.Checkbox(tab_move, "moving_cust_pitch", "Custom Pitch", false)
+    local moving_pitch = gui.Slider(tab_move, "moving_pitch", "Pitch Value", 0, -89, 89)
+    local moving_jitterpitch = gui.Checkbox(tab_move, "moving_jitterpitch", "Jitter Pitch", false)
+
+    local moving_mode_combobox = gui.Combobox(tab_move, "moving_mode_combobox", "Mode", "Off", "Jitter", "Crabwalk AA", "Static")
+
+    local moving_jitter_angle1 = gui.Slider(tab_move, "moving_jitter_angle1", "Jitter Angle 1", -180, -180, 180)
+    local moving_jitter_angle2 = gui.Slider(tab_move, "moving_jitter_angle2", "Jitter Angle 2", 180, -180, 180)
+    local moving_jitter_speed = gui.Slider(tab_move, "moving_jitter_speed", "Jitter Speed", 3, 1, 10)
+    local moving_jitter_flip = gui.Checkbox(tab_move, "moving_jitter_flip", "Flip Jitter Direction", false)
+
+    local moving_jitter_crab = gui.Slider(tab_move, "moving_jitter_crab", "Crab AA Speed", 3, 1, 10)
+
+    local moving_static_slider = gui.Slider(tab_move, "moving_static_slider", "Static Value", 0, -180, 180)
+
+    local moving_static_flip = gui.Checkbox(tab_move, "moving_static_flip", "Flip Direction", false)
+    local moving_static_center = gui.Checkbox(tab_move, "moving_static_center", "Center Direction", false)
+    moving_mode_combobox:SetDescription("Select the mode for the anti-aim.")
+    moving_jitter_angle1:SetDescription("The first jitter angle value")
+    moving_jitter_angle2:SetDescription("The second jitter angle value")
+    moving_jitter_speed:SetDescription("Adjust the speed of the jitter.")
+    moving_static_slider:SetDescription("The static value for angle.")
+-------------------------------MOVING---------------------------------
+
+------------------FREESTANDING--------------------
+    local fs_text = gui.Text(tab_fs, "Freestanding AA")
+    local fs_cust_pitch = gui.Checkbox(tab_fs, "fs_cust_pitch", "Custom Pitch", false)
+    local fs_pitch = gui.Slider(tab_fs, "fs_pitch", "Pitch Value", 0, -89, 89)
+    local fs_jitterpitch = gui.Checkbox(tab_fs, "fs_jitterpitch", "Jitter Pitch", false)
+
+    local fs_freestanding = gui.Checkbox(tab_fs, "fs_freestanding", "Freestanding", false)
+    local fs_value    = gui.Slider(tab_fs, "fs_value", "Freestand Angle", 0, 0, 90, 1); 
+    local fs_jitter = gui.Checkbox(tab_fs, "fs_jitter", "Jitter", false)
+    local fs_ljitter_angle1 = gui.Slider(tab_fs, "fs_ljitter_angle1", "Left Jitter Angle 1", 90, 0, 180)
+    local fs_ljitter_angle2 = gui.Slider(tab_fs, "fs_ljitter_angle2", "Left Jitter Angle 2", 90, 0, 180)
+    local fs_rjitter_angle1 = gui.Slider(tab_fs, "fs_rjitter_angle1", "Right Jitter Angle 1", 90, 0, 180)
+    local fs_rjitter_angle2 = gui.Slider(tab_fs, "fs_rjitter_angle2", "Right Jitter Angle 2", 90, 0, 180)
+
+    local fs_manual = gui.Checkbox(tab_fs, "fs_manual", "Manual AA", false)
+    local fs_manual_angle = gui.Slider(tab_fs, "fs_manual_angle", "Manual Angle", 90, 70, 90)
+    local fs_manual_left = gui.Checkbox(tab_fs, "fs_manual_left", "Left", false)
+    local fs_manual_right = gui.Checkbox(tab_fs, "fs_manual_right", "Right", false)
+
+------------------FREESTANDING--------------------
+
+
+-----------------SLOW-WALK-------------------------
+    local slowwalk_text = gui.Text(tab_sw_left, "Slowwalk AA")
+    local slowwalk_rndmslwwlk = gui.Checkbox(tab_sw_right, "slowwalk_rndmslwwlk", "Randomize Slow-walk", false)
+    local slowwalk_slwwlk_slider1 = gui.Slider(tab_sw_right, "slowwalk_slwwlk_slider1", "Slow-walk Min", 50, 0, 100)
+    local slowwalk_slwwlk_slider2 = gui.Slider(tab_sw_right, "slowwalk_slwwlk_slider2", "Slow-walk Max", 50, 0, 100)
+    local slowwalk_slwwlk_slider3 = gui.Slider(tab_sw_right, "slowwalk_slwwlk_slider3", "Slow-walk Delay", 3, 1, 10)
+
+    local slowwalk_cust_pitch = gui.Checkbox(tab_sw_left, "slowwalk_cust_pitch", "Custom Pitch", false)
+    local slowwalk_pitch = gui.Slider(tab_sw_left, "slowwalk_pitch", "Pitch Value", 0, -89, 89)
+    local slowwalk_jitterpitch = gui.Checkbox(tab_sw_left, "slowwalk_jitterpitch", "Jitter Pitch", false)
+
+    local slowwalk_mode_combobox = gui.Combobox(tab_sw_left, "slowwalk_mode_combobox", "Mode", "Off", "Jitter", "Crabwalk AA", "Static")
+
+    local slowwalk_jitter_angle1 = gui.Slider(tab_sw_left, "slowwalk_jitter_angle1", "Jitter Angle 1", -180, -180, 180)
+    local slowwalk_jitter_angle2 = gui.Slider(tab_sw_left, "slowwalk_jitter_angle2", "Jitter Angle 2", 180, -180, 180)
+    local slowwalk_jitter_speed = gui.Slider(tab_sw_left, "slowwalk_jitter_speed", "Jitter Speed", 3, 1, 10)
+    local slowwalk_jitter_flip = gui.Checkbox(tab_sw_left, "slowwalk_jitter_flip", "Flip Jitter Direction", false)
+
+    local slowwalk_jitter_crab = gui.Slider(tab_sw_left, "slowwalk_jitter_crab", "Crab AA Speed", 3, 1, 10)
+
+    local slowwalk_static_slider = gui.Slider(tab_sw_left, "slowwalk_static_slider", "Static Value", 0, -180, 180)
+
+    local slowwalk_static_flip = gui.Checkbox(tab_sw_left, "slowwalk_static_flip", "Flip Direction", false)
+    local slowwalk_static_center = gui.Checkbox(tab_sw_left, "slowwalk_static_center", "Center Direction", false)
+    slowwalk_slwwlk_slider3:SetDescription("how fast SW will change values")
+-----------------SLOW-WALK-------------------------
+
+    
+------------------------- UI ----------------------------------------------
+client.AllowListener("round_officially_ended");
+client.AllowListener("round_freeze_end");
+client.AllowListener("game_newmap");
+callbacks.Register("FireGameEvent", function(Event)
+    if Event ~= nil then
+    local player = entities.GetLocalPlayer()
+    local standingcustom_pitch_o = standing_cust_pitch:GetValue()
+    local movingcustom_pitch_o = moving_cust_pitch:GetValue()
+    local swcustom_pitch_o = slowwalk_cust_pitch:GetValue()
+    local fscustom_pitch_o = fs_cust_pitch:GetValue()
+        if Event:GetName() == "round_officially_ended" then
+            standing_cust_pitch:SetValue(false)
+            moving_cust_pitch:SetValue(false)
+            slowwalk_cust_pitch:SetValue(false)
+            fs_cust_pitch:SetValue(false)
+        elseif Event:GetName() == "round_freeze_end" or Event:GetName() == "game_newmap" then
+            standing_cust_pitch:SetValue(standingcustom_pitch_o)
+            moving_cust_pitch:SetValue(movingcustom_pitch_o)
+            slowwalk_cust_pitch:SetValue(swcustom_pitch_o)
+            fs_cust_pitch:SetValue(fscustom_pitch_o)
+        end
+    end
+end)
+
+
+callbacks.Register("CreateMove", function()
+if input.IsButtonDown(87) or input.IsButtonDown(65) or input.IsButtonDown(68) or input.IsButtonDown(83) or input.IsButtonDown(32) then
+    if shared:GetValue() then
+        moving = false
+    else
+        moving = true
+    end
+else
+    moving = false
+end
+
+if gui.GetValue("rbot.master") == true then
+if input.IsButtonDown(gui.GetValue("rbot.accuracy.movement.slowkey")) then
+        slowwalking = true
+    else
+        slowwalking = false
+    end
+end
+
+if gui.GetValue("rbot.antiaim.condition.autodir.edges") then
+        freestanding_val = true
+    else
+        freestanding_val = false
+    end
+end)
+-----------------JITTER FUNCTIONS------------------------
+local function standing_jitter()
+    local angle1 = standing_jitter_angle1:GetValue()
+    local angle2 = standing_jitter_angle2:GetValue()
+
+    if standing_jitter_flip:GetValue() then
+        if angle1 > 0 then
+            angle1 = angle1 * -1 
+        else angle1 = math.abs(angle1)end
+        if angle2 > 0 then
+            angle2 = angle2 * -1
+        else math.abs(angle2) end
+    end
+
+    if globals.RealTime() - jitter_timer >= (31 - (standing_jitter_speed:GetValue() + 30)) / 10 then
+        current_jitter_angle = current_jitter_angle == angle1 and angle2 or angle1
+        gui.SetValue("rbot.antiaim.base", current_jitter_angle)
+        jitter_timer = globals.RealTime()
+    end
+end
+
+local function moving_jitter()
+    local angle1 = moving_jitter_angle1:GetValue()
+    local angle2 = moving_jitter_angle2:GetValue()
+
+    if moving_jitter_flip:GetValue() then
+        if angle1 > 0 then
+            angle1 = angle1 * -1
+        else angle1 = math.abs(angle1) end
+        if angle2 > 0 then
+            angle2 = angle2 * -1
+        else math.abs(angle2) end
+    end
+
+    if globals.RealTime() - jitter_timer >= (31 - (moving_jitter_speed:GetValue() + 30)) / 10 then
+        current_jitter_angle = current_jitter_angle == angle1 and angle2 or angle1
+        gui.SetValue("rbot.antiaim.base", current_jitter_angle)
+        jitter_timer = globals.RealTime()
+    end
+end
+
+local function slowwalk_jitter()
+    local angle1 = slowwalk_jitter_angle1:GetValue()
+    local angle2 = slowwalk_jitter_angle2:GetValue()
+
+    if moving_jitter_flip:GetValue() then
+        if angle1 > 0 then
+            angle1 = angle1 * -1
+        else angle1 = math.abs(angle1) end
+        if angle2 > 0 then
+            angle2 = angle2 * -1
+        else math.abs(angle2) end
+    end
+
+    if globals.RealTime() - jitter_timer >= (31 - (slowwalk_jitter_speed:GetValue() + 30)) / 10 then
+        current_jitter_angle = current_jitter_angle == angle1 and angle2 or angle1
+        gui.SetValue("rbot.antiaim.base", current_jitter_angle)
+        jitter_timer = globals.RealTime()
+    end
+end
+
+local function freestand_jitter()
+    local langle1 = fs_ljitter_angle1:GetValue()
+    local langle2 = fs_ljitter_angle2:GetValue()
+
+    local rangle1 = fs_rjitter_angle1:GetValue()
+    local rangle2 = fs_rjitter_angle2:GetValue()
+    if globals.RealTime() - freestand_ltimer >= (31 - (10 + 30)) / 10 then
+        current_freestand_langle = current_freestand_langle == langle1 and langle2 or langle1
+        gui.SetValue("rbot.antiaim.left", current_freestand_langle)
+        freestand_ltimer = globals.RealTime()
+    end
+
+    if globals.RealTime() - freestand_rtimer >= (31 - (10 + 30)) / 10 then
+        current_freestand_rangle = current_freestand_rangle == rangle1 and rangle2 or rangle1
+        gui.SetValue("rbot.antiaim.right", current_freestand_rangle * -1)
+        freestand_rtimer = globals.RealTime()
+    end
+end
+-----------------JITTER FUNCTIONS------------------------
+
+-----------------CRABWALK FUNCTIONS------------------------
+local function crabwalkAA()
+    if globals.RealTime() - crabwalk_timer >= (30 - (standing_jitter_crab:GetValue() + 30)) / 10 then
+        local crab_angle1 = math.random(-179, -158)
+        local crab_angle2 = math.random(-179, -158)
+        current_crabwalk_angle = current_crabwalk_angle == crab_angle1 and crab_angle2 or crab_angle1
+        gui.SetValue("rbot.antiaim.base", current_crabwalk_angle)
+        crabwalk_timer = globals.RealTime()
+    end
+    if globals.RealTime() - crabwalk_timer >= (30 - (moving_jitter_crab:GetValue() + 30)) / 10 then
+        local crab_angle1 = math.random(-179, -158)
+        local crab_angle2 = math.random(-179, -158)
+        current_crabwalk_angle = current_crabwalk_angle == crab_angle1 and crab_angle2 or crab_angle1
+        gui.SetValue("rbot.antiaim.base", current_crabwalk_angle)
+        crabwalk_timer = globals.RealTime()
+    end
+    if globals.RealTime() - crabwalk_timer >= (30 - (slowwalk_jitter_crab:GetValue() + 30)) / 10 then
+        local crab_angle1 = math.random(-179, -158)
+        local crab_angle2 = math.random(-179, -158)
+        current_crabwalk_angle = current_crabwalk_angle == crab_angle1 and crab_angle2 or crab_angle1
+        gui.SetValue("rbot.antiaim.base", current_crabwalk_angle)
+        crabwalk_timer = globals.RealTime()
+    end
+end
+-----------------CRABWALK FUNCTIONS------------------------
+
+-----------------SLOW-WALK HANDLER------------------------
+local function handleSlowWalk()
+    local minSpeed = slowwalk_slwwlk_slider1:GetValue()
+    local maxSpeed = slowwalk_slwwlk_slider2:GetValue()
+  
+    if globals.RealTime() - slwwlk_timer >= (30- (slowwalk_slwwlk_slider3:GetValue() + 30)) / 10 then
+        current_slowwalk_speed = math.random(minSpeed, maxSpeed)
+        gui.SetValue("rbot.accuracy.movement.slowspeed", current_slowwalk_speed)
+        slwwlk_timer = globals.RealTime()
+    end
+end
+-----------------SLOW-WALK HANDLER------------------------
+
+---------- PITCH HANDLER -------------------
+callbacks.Register("CreateMove", function(cmd)
+if cmd ~= nil then
+    if standing_jitterpitch:GetValue() then
+        standing_pitch:SetValue(math.random(-89, 89))
+    end
+    if standing_cust_pitch:GetValue() ~= true then return end
+
+    local localplayer = entities.GetLocalPlayer()
+    local weapon = localplayer:GetWeaponID()
+    if table.contains(nades, weapon) then return end
+
+	local ViewAngles = cmd:GetViewAngles()
+        
+	cmd:SetViewAngles(EulerAngles(standing_pitch:GetValue(), ViewAngles.y, ViewAngles.z))
+end
+end)
+
+callbacks.Register("CreateMove", function(cmd)
+if cmd ~= nil then
+    local localplayer = entities.GetLocalPlayer()
+    local weapon = localplayer:GetWeaponID()
+
+    if moving == true and slowwalking == false then
+        if moving_jitterpitch:GetValue() then
+            moving_pitch:SetValue(math.random(-89, 89))
+        end
+        if moving_cust_pitch:GetValue() ~= true then return end
+        if table.contains(nades, weapon) then return end
+
+        local ViewAngles = cmd:GetViewAngles()
+        cmd:SetViewAngles(EulerAngles(moving_pitch:GetValue(), ViewAngles.y, ViewAngles.z))
+    end
+end
+end)
+
+callbacks.Register("CreateMove", function(cmd)
+    if cmd ~= nil then
+    local localplayer = entities.GetLocalPlayer()
+    local weapon = localplayer:GetWeaponID()
+
+    if slowwalking == true then
+        if slowwalk_jitterpitch:GetValue() then
+            slowwalk_pitch:SetValue(math.random(-89, 89))
+        end
+        if slowwalk_cust_pitch:GetValue() ~= true then return end
+        if table.contains(nades, weapon) then return end
+
+        local ViewAngles = cmd:GetViewAngles()
+        cmd:SetViewAngles(EulerAngles(slowwalk_pitch:GetValue(), ViewAngles.y, ViewAngles.z))
+    end
+end
+end)
+callbacks.Register("CreateMove", function(cmd)
+    if cmd ~= nil then
+    local localplayer = entities.GetLocalPlayer()
+    local weapon = localplayer:GetWeaponID()
+
+    if slowwalking == false and freestanding_val == true then
+        if fs_jitterpitch:GetValue() then
+            fs_pitch:SetValue(math.random(-89, 89))
+        end
+        if fs_cust_pitch:GetValue() ~= true then return end
+        if table.contains(nades, weapon) then return end
+
+        local ViewAngles = cmd:GetViewAngles()
+        cmd:SetViewAngles(EulerAngles(fs_pitch:GetValue(), ViewAngles.y, ViewAngles.z))
+    end
+end
+end)
+---------- PITCH HANDLER -------------------
+
+---------- TAB HANDLER -----------------------
+local function handleTabBtn()
+    STANDING_BTN:SetDisabled(false)
+    MOVING_BTN:SetDisabled(false)
+    FREESTAND_BTN:SetDisabled(false)
+    Slowwalk_BTN:SetDisabled(false)
+    if activeMenu == menus.standing then
+        STANDING_BTN:SetDisabled(true)
+    elseif activeMenu == menus.moving then
+        MOVING_BTN:SetDisabled(true)
+    elseif activeMenu == menus.freestand then
+        FREESTAND_BTN:SetDisabled(true)
+    elseif activeMenu == menus.slowwalk then
+        Slowwalk_BTN:SetDisabled(true)
+    end
+end
+---------- TAB HANDLER -----------------------
+
+---------- MAIN DRAW FUNCTION ----------------
+
+callbacks.Register("Draw", function()
+--- MENU VISIBILITY CALLS ---
+    if shared:GetValue() then
+        tab_move:SetDisabled(true)
+        tab_sw_left:SetDisabled(true)
+    else
+        tab_move:SetDisabled(false)
+        tab_sw_left:SetDisabled(false)
+    end
+
+    if activeMenu == menus.standing then
+        tab_stand:SetInvisible(false)
+
+        tab_move:SetInvisible(true)
+        tab_fs:SetInvisible(true)
+        tab_sw_left:SetInvisible(true)
+        tab_sw_right:SetInvisible(true)
+
+    end
+    if activeMenu == menus.moving then
+        tab_move:SetInvisible(false)
+
+        tab_stand:SetInvisible(true)
+        tab_fs:SetInvisible(true)
+        tab_sw_left:SetInvisible(true)
+        tab_sw_right:SetInvisible(true)
+
+    end
+    if activeMenu == menus.freestand then
+        tab_fs:SetInvisible(false)
+
+        tab_stand:SetInvisible(true)
+        tab_move:SetInvisible(true)
+        tab_sw_left:SetInvisible(true)
+        tab_sw_right:SetInvisible(true)
+
+    end
+    if activeMenu == menus.slowwalk then
+        tab_sw_left:SetInvisible(false)
+        tab_sw_right:SetInvisible(false)
+
+        tab_stand:SetInvisible(true)
+        tab_move:SetInvisible(true)
+        tab_fs:SetInvisible(true)
+    end
+--- MENU VISIBILITY CALLS ---
+
+    if bTabClicked then
+        handleTabBtn()
+        bTabClicked = false
+    end
+
+    freestand_ltimer = globals.RealTime()
+    freestand_rtimer = globals.RealTime()
+    jitter_timer = globals.RealTime()
+    crabwalk_timer = globals.RealTime()
+    slwwlk_timer = globals.RealTime()
+
+    standing_pitch:SetInvisible(standing_cust_pitch:GetValue() ~= true and true or false)
+    standing_jitterpitch:SetInvisible(standing_cust_pitch:GetValue() ~= true and true or false)
+    moving_pitch:SetInvisible(moving_cust_pitch:GetValue() ~= true and true or false)
+    moving_jitterpitch:SetInvisible(moving_cust_pitch:GetValue() ~= true and true or false)
+    slowwalk_pitch:SetInvisible(slowwalk_cust_pitch:GetValue() ~= true and true or false)
+    slowwalk_jitterpitch:SetInvisible(slowwalk_cust_pitch:GetValue() ~= true and true or false)
+    fs_pitch:SetInvisible(fs_cust_pitch:GetValue() ~= true and true or false)
+    fs_jitterpitch:SetInvisible(fs_cust_pitch:GetValue() ~= true and true or false)
+-------------------------STANDING-----------------------------------------
+
+    local standing_mode = standing_mode_combobox:GetValue()
+
+    -- HANDLE STANDING AA FUNCTIONS --
+    if standing_mode == 1 and moving == false and freestanding_val == false  and fs_manual:GetValue() == false then 
+        standing_jitter()
+    elseif standing_mode == 2 and moving == false and freestanding_val == false and fs_manual:GetValue() == false then
+        crabwalkAA()
+    elseif standing_mode == 3 and moving == false and freestanding_val == false and fs_manual:GetValue() == false then
+        local static_dir = standing_static_slider:GetValue()
+
+        if standing_static_center:GetValue() == true and standing_static_flip:GetValue() == true then
+            standing_static_flip:SetValue(false)
+        end
+        if standing_static_flip:GetValue() then
+            
+            if static_dir > 0 then
+                static_dir = static_dir * -1
+            else
+                static_dir = math.abs(static_dir)
+            end
+        end
+        if aaEnable:GetValue() then
+            gui.SetValue("rbot.antiaim.base", "0 Backward")
+        end
+        gui.SetValue("rbot.antiaim.base", static_dir)
+
+        if standing_static_center:GetValue() then
+            gui.SetValue("rbot.antiaim.base", math.abs(179))
+        end
+    else 
+
+    end
+    -- HANDLE STANDING AA FUNCTIONS --
+
+
+    if standing_mode == 1 and activeMenu == menus.standing then --JITTER AA--
+
+        standing_jitter_crab:SetInvisible(true)
+        standing_jitter_angle1:SetInvisible(false)
+        standing_jitter_angle2:SetInvisible(false)
+        standing_jitter_speed:SetInvisible(false)
+        standing_jitter_flip:SetInvisible(false)
+        standing_static_slider:SetInvisible(true)
+        standing_static_flip:SetInvisible(true)
+        standing_static_center:SetInvisible(true)
+    elseif standing_mode == 2 and activeMenu == menus.standing then --CRABWALK AA--
+
+        standing_jitter_crab:SetInvisible(false)
+        standing_jitter_angle1:SetInvisible(true)
+        standing_jitter_angle2:SetInvisible(true)
+        standing_jitter_speed:SetInvisible(true)
+        standing_jitter_flip:SetInvisible(true)
+        standing_static_slider:SetInvisible(true)
+        standing_static_flip:SetInvisible(true)
+        standing_static_center:SetInvisible(true)
+    elseif standing_mode == 3 and activeMenu == menus.standing then --STATIC AA--
+
+        standing_jitter_crab:SetInvisible(true)
+        standing_jitter_angle1:SetInvisible(true)
+        standing_jitter_angle2:SetInvisible(true)
+        standing_jitter_speed:SetInvisible(true)
+        standing_jitter_flip:SetInvisible(true)
+        standing_static_slider:SetInvisible(false)
+        standing_static_flip:SetInvisible(false)
+       standing_static_center:SetInvisible(false)
+    else -- AA OFF --
+
+        standing_jitter_crab:SetInvisible(true) 
+        standing_jitter_angle1:SetInvisible(true)
+        standing_jitter_angle2:SetInvisible(true)
+        standing_jitter_speed:SetInvisible(true)
+        standing_jitter_flip:SetInvisible(true)
+        standing_static_slider:SetInvisible(true)
+        standing_static_flip:SetInvisible(true)
+        standing_static_center:SetInvisible(true)
+    end
+-------------------------STANDING-----------------------------------------
+
+
+
+-------------------------MOVING-------------------------------------------
+
+    local moving_mode = moving_mode_combobox:GetValue()
+    -- HANDLE MOVING AA FUNCTIONS --
+    if moving_mode == 1 and moving == true and slowwalking == false and freestanding_val == false  and fs_manual:GetValue() == false then 
+        moving_jitter()
+    elseif moving_mode == 2 and moving == true and slowwalking == false and freestanding_val == false  and fs_manual:GetValue() == false then
+        crabwalkAA()
+    elseif moving_mode == 3 and moving == true and slowwalking == false and freestanding_val == false  and fs_manual:GetValue() == false then
+        local static_dir = moving_static_slider:GetValue()
+
+        if moving_static_center:GetValue() == true and moving_static_flip:GetValue() == true then
+            moving_static_flip:SetValue(false)
+        end
+        if moving_static_flip:GetValue() then
+            
+            if static_dir > 0 then
+                static_dir = static_dir * -1
+            else
+                static_dir = math.abs(static_dir)
+            end
+        end
+        gui.SetValue("rbot.antiaim.base", static_dir)
+        if moving_static_center:GetValue() then
+            gui.SetValue("rbot.antiaim.base", math.abs(179))
+        end
+    else
+
+    end
+    -- HANDLE MOVING AA FUNCTIONS --
+
+    if moving_mode == 1 and activeMenu == menus.moving then --JITTER AA--
+        moving_jitter_crab:SetInvisible(true)
+        moving_jitter_angle1:SetInvisible(false)
+        moving_jitter_angle2:SetInvisible(false)
+        moving_jitter_speed:SetInvisible(false)
+        moving_jitter_flip:SetInvisible(false)
+        moving_static_slider:SetInvisible(true)
+        moving_static_flip:SetInvisible(true)
+        moving_static_center:SetInvisible(true)
+    elseif moving_mode == 2 and activeMenu == menus.moving then --CRABWALK AA--
+        moving_jitter_crab:SetInvisible(false)
+        moving_jitter_angle1:SetInvisible(true)
+        moving_jitter_angle2:SetInvisible(true)
+        moving_jitter_speed:SetInvisible(true)
+        moving_jitter_flip:SetInvisible(true)
+        moving_static_slider:SetInvisible(true)
+        moving_static_flip:SetInvisible(true)
+        moving_static_center:SetInvisible(true)
+    elseif moving_mode == 3 and activeMenu == menus.moving then --STATIC AA--
+        moving_jitter_crab:SetInvisible(true)
+        moving_jitter_angle1:SetInvisible(true)
+        moving_jitter_angle2:SetInvisible(true)
+        moving_jitter_speed:SetInvisible(true)
+        moving_jitter_flip:SetInvisible(true)
+        moving_static_slider:SetInvisible(false)
+        moving_static_flip:SetInvisible(false)
+        moving_static_center:SetInvisible(false)
+    else                                                        -- AA OFF --
+        moving_jitter_crab:SetInvisible(true) 
+        moving_jitter_angle1:SetInvisible(true)
+        moving_jitter_angle2:SetInvisible(true)
+        moving_jitter_speed:SetInvisible(true)
+        moving_jitter_flip:SetInvisible(true)
+        moving_static_slider:SetInvisible(true)
+        moving_static_flip:SetInvisible(true)
+        moving_static_center:SetInvisible(true)
+    end
+-------------------------MOVING-------------------------------------------
+
+
+-------------------------FREESTANDING-------------------------------------
+    if fs_jitter:GetValue() then
+            freestand_jitter()
+    end
+    if fs_jitter:GetValue() and activeMenu == menus.freestand then
+        fs_ljitter_angle1:SetInvisible(false)
+        fs_ljitter_angle2:SetInvisible(false)
+        fs_rjitter_angle1:SetInvisible(false)
+        fs_rjitter_angle2:SetInvisible(false)
+    else
+        fs_ljitter_angle1:SetInvisible(true)
+        fs_ljitter_angle2:SetInvisible(true)
+        fs_rjitter_angle1:SetInvisible(true)
+        fs_rjitter_angle2:SetInvisible(true)
+    end
+
+    if fs_freestanding:GetValue() then
+        local original_setting = gui.GetValue("rbot.antiaim.condition.autodir.edges")
+        gui.SetValue("rbot.antiaim.condition.autodir.edges", true)
+        gui.SetValue("rbot.antiaim.right", "0 Backward")
+        gui.SetValue("rbot.antiaim.right", fs_value:GetValue()*-1)
+        gui.SetValue("rbot.antiaim.left", "0 Backward")
+        gui.SetValue("rbot.antiaim.left", fs_value:GetValue()*1)
+    else
+        gui.SetValue("rbot.antiaim.condition.autodir.edges", original_setting)
+    end
+
+    if fs_manual:GetValue() then
+
+        if fs_manual_left:GetValue() and not fs_manual_right:GetValue() then
+            gui.SetValue("rbot.antiaim.base", -fs_manual_angle:GetValue())
+			fs_manual_right:SetValue(false)
+        elseif not fs_manual_left:GetValue() and not fs_manual_right:GetValue() then
+            gui.SetValue("rbot.antiaim.base", 180)
+        end
+        if fs_manual_left:GetValue() and fs_manual_right:GetValue() then
+            fs_manual_left:SetValue(false)
+        elseif fs_manual_right:GetValue() and fs_manual_left:GetValue() then
+            fs_manual_right:SetValue(false)
+        end
+
+
+        if fs_manual_right:GetValue() and not fs_manual_left:GetValue() then
+            gui.SetValue("rbot.antiaim.base", fs_manual_angle:GetValue())
+			fs_manual_left:SetValue(false)
+        elseif not fs_manual_right:GetValue() and not fs_manual_left:GetValue() then
+            gui.SetValue("rbot.antiaim.base", 180)
+        end
+
+    end
+-------------------------FREESTANDING-------------------------------------
+
+-------------------------SLOWWALK-------------------------------------
+
+    local slowwalk_mode = slowwalk_mode_combobox:GetValue()
+    if slowwalk_mode == 1 and slowwalking == true and shared:GetValue() == false and freestanding_val == false  and fs_manual:GetValue() == false then 
+        slowwalk_jitter()
+    elseif slowwalk_mode == 2 and slowwalking == true and shared:GetValue() == false and freestanding_val == false and fs_manual:GetValue() == false then
+        crabwalkAA()
+    elseif slowwalk_mode == 3 and slowwalking == true and shared:GetValue() == false and freestanding_val == false  and fs_manual:GetValue() == false then
+        local static_dir = slowwalk_static_slider:GetValue()
+
+        if slowwalk_static_center:GetValue() == true and slowwalk_static_flip:GetValue() == true then
+            slowwalk_static_flip:SetValue(false)
+        end
+        if slowwalk_static_flip:GetValue() then
+            
+            if static_dir > 0 then
+                static_dir = static_dir * -1
+            else
+                static_dir = math.abs(static_dir)
+            end
+        end
+        gui.SetValue("rbot.antiaim.base", static_dir)
+
+        if slowwalk_static_center:GetValue() then
+            gui.SetValue("rbot.antiaim.base", math.abs(179))
+        end
+    else
+
+    end
+    -- HANDLE MOVING AA FUNCTIONS --
+     if slowwalk_rndmslwwlk:GetValue() == true and activeMenu == menus.slowwalk then
+        if slowwalking == true then
+            handleSlowWalk()
+        end
+        slowwalk_slwwlk_slider1:SetInvisible(false)
+        slowwalk_slwwlk_slider2:SetInvisible(false)
+        slowwalk_slwwlk_slider3:SetInvisible(false)
+    end
+    if slowwalk_rndmslwwlk:GetValue() == false and activeMenu == menus.slowwalk then 
+        slowwalk_slwwlk_slider1:SetInvisible(true)
+        slowwalk_slwwlk_slider2:SetInvisible(true)
+        slowwalk_slwwlk_slider3:SetInvisible(true)
+    end
+
+    if slowwalk_mode == 1 and activeMenu == menus.slowwalk then --JITTER AA--
+        slowwalk_jitter_crab:SetInvisible(true)
+        slowwalk_jitter_angle1:SetInvisible(false)
+        slowwalk_jitter_angle2:SetInvisible(false)
+        slowwalk_jitter_speed:SetInvisible(false)
+        slowwalk_jitter_flip:SetInvisible(false)
+        slowwalk_static_slider:SetInvisible(true)
+
+        slowwalk_static_flip:SetInvisible(true)
+        slowwalk_static_center:SetInvisible(true)
+    elseif slowwalk_mode == 2 and activeMenu == menus.slowwalk then --CRABWALK AA--
+        slowwalk_jitter_crab:SetInvisible(false)
+        slowwalk_jitter_angle1:SetInvisible(true)
+        slowwalk_jitter_angle2:SetInvisible(true)
+        slowwalk_jitter_speed:SetInvisible(true)
+        slowwalk_jitter_flip:SetInvisible(true)
+        slowwalk_static_slider:SetInvisible(true)
+
+        slowwalk_static_flip:SetInvisible(true)
+        slowwalk_static_center:SetInvisible(true)
+    elseif slowwalk_mode == 3 and activeMenu == menus.slowwalk then --STATIC AA--
+        slowwalk_jitter_crab:SetInvisible(true)
+        slowwalk_jitter_angle1:SetInvisible(true)
+        slowwalk_jitter_angle2:SetInvisible(true)
+        slowwalk_jitter_speed:SetInvisible(true)
+        slowwalk_jitter_flip:SetInvisible(true)
+        slowwalk_static_slider:SetInvisible(false)
+
+        slowwalk_static_flip:SetInvisible(false)
+        slowwalk_static_center:SetInvisible(false)
+    else                                                        -- AA OFF --
+        slowwalk_jitter_crab:SetInvisible(true) 
+        slowwalk_jitter_angle1:SetInvisible(true)
+        slowwalk_jitter_angle2:SetInvisible(true)
+        slowwalk_jitter_speed:SetInvisible(true)
+        slowwalk_jitter_flip:SetInvisible(true)
+        slowwalk_static_slider:SetInvisible(true)
+
+        slowwalk_static_flip:SetInvisible(true)
+        slowwalk_static_center:SetInvisible(true)
+    end
+-------------------------SLOWWALK-------------------------------------
+end)
+
+---------- MAIN DRAW FUNCTION ----------------
+
