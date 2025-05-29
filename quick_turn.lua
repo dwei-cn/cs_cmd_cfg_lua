@@ -5,7 +5,7 @@ local enable = gui.Checkbox(box, "quickturn.enable", "Enable Quick Turn", True)
 local keybox_left = gui.Keybox(box, "quickturn.leftkey", "Turn Right Key", 0) 
 local keybox_right = gui.Keybox(box, "quickturn.rightkey", "Turn Left Key", 0) 
 local step_slider = gui.Slider(box, "quickturn.stepsize", "Angle Per Frame", 45, 0, 90)
-local total_slider = gui.Slider(box, "quickturn.totalangle", "Total Turn Angle", 90, 0, 180)
+local total_slider = gui.Slider(box, "quickturn.totalangle", "Total Turn Angle", 180, 0, 360)
 
 local turning = false
 local direction = 0 -- -1 for left, 1 for right
