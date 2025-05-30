@@ -9,3 +9,7 @@
 -noaafonts //Removes font smoothing.
 
 -no joy //Removes gamepad/joystick support.
+
+
+example:
+-threads 7 -novid -high -nod3d9ex -noaafonts -no joy
