@@ -1,0 +1,11 @@
+-novid //Disables the game's intro screen saver.
+
+-high //Starts the game with a high priority.
+
+-threads <number of cores/threads> //The number of processor cores that the game can use.
+
+-nod3d9ex //Reduces memory consumption and speeds up switching between windows (alt+tab)
+
+-noaafonts //Removes font smoothing.
+
+-no joy //Removes gamepad/joystick support.
