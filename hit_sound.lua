@@ -1,3 +1,6 @@
+-- download vsnd_c file https://github.com/tickcount/hitsounds/blob/master/agpa2.vsnd_c
+-- sound folder: D:\Program Files (x86)\Steam\steamapps\common\Counter-Strike Global Offensive\game\csgo\sounds
+
 local guiRef = gui.Reference("Misc", "General", "Extra");
 
 local guiSelection = gui.Combobox(guiRef, "hitsound", "Hitsound", "Hide", "Show General Settings", "Show File Inputs");
